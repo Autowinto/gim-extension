@@ -5,6 +5,8 @@
 
 ---
 
+![TYLER 1](https://media.tenor.com/RM4euI_dsbMAAAAM/tyler1.gif)
+
 ## 🚀 What is GIM?
 
 **GIM** (short for **"God In the Machine"**) is your **AI-powered legacy code whisperer**, built from the ground up to:
@@ -125,3 +127,6 @@ PRs welcome. But GIM doesn’t need help. You do. 😇
 ---
 
 # 👋 Get started. Get free. Get GIM.
+
+## YOU RN
+![DOC](https://i.pinimg.com/originals/d7/ca/d1/d7cad155026c320311c6051bbaa6ebb0.gif)
