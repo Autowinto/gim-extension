@@ -1,6 +1,6 @@
 # ⚡️ GIM — BLAZINGLY FAST, PRIVACY-FIRST, LIGHTWEIGHT, AGENTIC AI LEGACY CODE EXPLAINER FOR C# ⚡️
 
-> **“The last developer you'll ever need.”**  
+> **“The last developer you'll ever need.”**
 > — Probably your CEO, circa 2025
 
 ---
@@ -11,22 +11,22 @@
 
 **GIM** (short for **"God In the Machine"**) is your **AI-powered legacy code whisperer**, built from the ground up to:
 
-✅ Understand your 20-year-old C# monolith faster than your senior devs  
-✅ Translate spaghetti code into ✨human✨ explanations  
-✅ Generate documentation, summaries, and diagrams INSTANTLY  
-✅ Run 100% **locally** — your secrets stay YOURS 🔐  
-✅ Cut through tech debt like a chainsaw through butter 🪚🧈  
+✅ Understand your 20-year-old C# monolith faster than your senior devs
+✅ Translate spaghetti code into ✨human✨ explanations
+✅ Generate documentation, summaries, and diagrams INSTANTLY
+✅ Run 100% **locally** — your secrets stay YOURS 🔐
+✅ Cut through tech debt like a chainsaw through butter 🪚🧈
 ✅ Replace entire dev teams with a single `.exe` 👋👨‍💻
 
 ---
 
 ## 🧠 Why GIM?
 
-🦖 Legacy code? Solved.  
-🤖 AI-powered explanations? Instant.  
-🏢 Enterprise-ready? Born for it.  
-🪶 Lightweight? Feather.  
-🧍 No cloud? No problem.  
+🦖 Legacy code? Solved.
+🤖 AI-powered explanations? Instant.
+🏢 Enterprise-ready? Born for it.
+🪶 Lightweight? Feather.
+🧍 No cloud? No problem.
 💼 Fire the dev team? We won’t tell. 😉
 
 ---
@@ -87,10 +87,10 @@ Get this:
 
 ## 🛡️ Privacy First
 
-🚫 No APIs  
-🚫 No cloud calls  
-🚫 No telemetry  
-✅ Everything runs on your machine  
+🚫 No APIs
+🚫 No cloud calls
+🚫 No telemetry
+✅ Everything runs on your machine
 ✅ Your secrets are YOURS
 
 ---
@@ -121,7 +121,7 @@ PRs welcome. But GIM doesn’t need help. You do. 😇
 
 ## 🧠 TL;DR
 
-**🔥 GIM is the only tool you need to understand, explain, and dominate legacy C# codebases.**  
+**🔥 GIM is the only tool you need to understand, explain, and dominate legacy C# codebases.**
 **Because legacy code doesn’t have to mean legacy thinking.**
 
 ---
