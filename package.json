@@ -1,21 +1,33 @@
 {
   "name": "gim",
   "displayName": "gim",
-  "description": "GIM (BLAZINGLY FAST PRIVACY FIRST LIGHTWEIGHT AGENTIC AI LEGACY CODE EXPLAINER MODEL). ENABLES CEOS TO FIRE ALL DEVELOPERS CIRCA 2025",
   "version": "1.0.0",
-  "engines": {
-    "vscode": "^1.103.0"
-  },
+  "description": "GIM (BLAZINGLY FAST PRIVACY FIRST LIGHTWEIGHT AGENTIC AI LEGACY CODE EXPLAINER MODEL). ENABLES CEOS TO FIRE ALL DEVELOPERS CIRCA 2025",
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
   "main": "./out/extension.js",
+  "engines": {
+    "vscode": "^1.103.0"
+  },
+  "activationEvents": [],
   "contributes": {
     "commands": [
       {
-        "command": "gim.run",
-        "title": "Run GIM"
+        "command": "gim.selection.docstring",
+        "title": "GIM: Docstring from Selection"
+      },
+      {
+        "command": "gim.selection.analyze",
+        "title": "GIM: Analyze Selection"
+      },
+      {
+        "command": "gim.selection.explain",
+        "title": "GIM: Explain Selection"
+      },
+      {
+        "command": "gim.file.analyze",
+        "title": "GIM: Analyze Current File"
       }
     ]
   },
@@ -28,15 +40,15 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.103.0",
+    "@antfu/eslint-config": "^5.2.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
+    "@types/vscode": "^1.103.0",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
-    "eslint": "^9.32.0",
-    "typescript": "^5.9.2",
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
-    "@antfu/eslint-config": "^5.2.2"
+    "eslint": "^9.32.0",
+    "typescript": "^5.9.2"
   }
 }

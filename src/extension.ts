@@ -1,13 +1,55 @@
 import * as vscode from 'vscode'
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Congratulations, your extension "gim" is now active!')
+  console.log('Activating GIM')
 
-  const disposable = vscode.commands.registerCommand('gim.run', () => {
-    vscode.window.showInformationMessage('Hello World from gim!')
-  })
-
-  context.subscriptions.push(disposable)
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.selection.docstring',
+      docstringFromSelection,
+    ),
+  )
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.selection.analyze',
+      analyzeSelection,
+    ),
+  )
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.file.analyze',
+      analyzeFile,
+    ),
+  )
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.selection.explain',
+      explainFromSelection,
+    ),
+  )
 }
 
-export function deactivate() {}
+function docstringFromSelection() {
+  vscode.window.showInformationMessage('GIM: TODO IMPLEMENT DOCSTRING SELECTION!')
+}
+
+function analyzeSelection() {
+  vscode.window.showInformationMessage('GIM: TODO IMPLEMENT SELECTION ANALYSIS!')
+}
+
+function explainFromSelection() {
+  vscode.window.showInformationMessage('GIM: TODO IMPLEMENT EXPLAIN SELECTION!')
+}
+
+function analyzeFile() {
+  const editor = vscode.window.activeTextEditor
+  if (editor) {
+    vscode.window.showInformationMessage(`GIM: Current file is !${editor.document}`)
+    return
+  }
+
+  vscode.window.showErrorMessage('GIM: No file open')
+}
+
+export function deactivate() {
+}
