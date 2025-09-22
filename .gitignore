@@ -13,7 +13,7 @@ node_modules
 *.sln.docstates
 
 # Build results
-
+debug-project/
 [Dd]ebug/
 [Rr]elease/
 x64/
