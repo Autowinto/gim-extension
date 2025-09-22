@@ -14,6 +14,14 @@
   "contributes": {
     "commands": [
       {
+        "command": "gim.acceptChanges",
+        "title": "Accept Suggestion",
+        "icon": {
+          "light": "resources/light/check.svg",
+          "dark": "resources/dark/check.svg"
+        }
+      },
+      {
         "command": "gim.selection.docstring",
         "title": "GIM: Docstring from Selection"
       },
@@ -29,7 +37,16 @@
         "command": "gim.file.analyze",
         "title": "GIM: Analyze Current File"
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "gim.acceptChanges",
+          "group": "navigation",
+          "when": "isInDiffEditor && resourceScheme == gim-diff"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
