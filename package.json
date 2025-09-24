@@ -10,9 +10,15 @@
   "engines": {
     "vscode": "^1.103.0"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
+      {
+        "command": "gim.update-indexes",
+        "title": "GIM: Update Indexes"
+      },
       {
         "command": "gim.selection.docstring",
         "title": "GIM: Docstring from Selection"
@@ -38,6 +44,9 @@
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint src",
     "test": "vscode-test"
+  },
+  "dependencies": {
+    "axios": "^1.12.2"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^5.2.2",
