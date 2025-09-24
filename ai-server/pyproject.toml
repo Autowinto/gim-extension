@@ -7,4 +7,9 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi[standard]>=0.117.1",
     "ollama>=0.5.4",
+    "peft>=0.17.1",
+    "sse-starlette>=3.0.2",
+    "torch>=2.8.0",
+    "transformers>=4.56.2",
+    "uvicorn>=0.37.0",
 ]

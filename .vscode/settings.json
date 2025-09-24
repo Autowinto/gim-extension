@@ -56,5 +56,6 @@
     "scss",
     "pcss",
     "postcss"
-  ]
+  ],
+  "python-envs.pythonProjects": []
 }
