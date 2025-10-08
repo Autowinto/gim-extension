@@ -8,12 +8,14 @@ from contextlib import asynccontextmanager
 
 DB_NAME = "database.db"
 
+# Makes sure that each time the server starts up, the database is initialized with the corret tables, it does not drop old tables.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     yield
     print("Shutting down...")
-    
+    with get_db_connection() as conn:
+        conn.close()
 app = FastAPI(lifespan=lifespan)
 
 @contextmanager
@@ -36,18 +38,21 @@ def init_db():
     with get_db_connection() as conn:
         cursor = conn.cursor()
         tables = Tables.define_tables()
-        # Drop everything, at start   # Drop old table if it exists
-        # cursor.execute("DROP TABLE IF EXISTS projects")
-        # cursor.execute("DROP TABLE IF EXISTS documents")
-        # cursor.execute("DROP TABLE IF EXISTS classes")
-        # cursor.execute("DROP TABLE IF EXISTS methods")
-        # cursor.execute("DROP TABLE IF EXISTS method_calls")
-        print("Creating tables...")
+        print("Creating tables...") 
         for table in tables:
             cursor.execute(table)
 
         conn.commit()
 
+def drop_everything():
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DROP TABLE IF EXISTS projects")
+        cursor.execute("DROP TABLE IF EXISTS documents")
+        cursor.execute("DROP TABLE IF EXISTS classes")
+        cursor.execute("DROP TABLE IF EXISTS methods")
+        cursor.execute("DROP TABLE IF EXISTS method_calls")
+        conn.commit()
 
 def fetch_from_table(table_name, query=None):
     try:
@@ -96,6 +101,7 @@ def fetch_all():
         with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
+            # Fetches all relevant data in one go, including method calls as nested arrays.
             select_query = '''
                 SELECT
                     prj.id as project_id, prj.name as project_name,
@@ -145,11 +151,10 @@ def fetch_all():
 async def update_indexes(body: UpdateIndexesRequest):
     # Upload data to database
     try:
-        projects: list[object] = body.projects  # Array
+        projects: list[object] = body.projects  # List of projects
 
         try:
             with get_db_connection() as conn:
-        
                 for project in projects:
                     updater = UpdateIndexes(project, conn=conn)
                     result = updater.process()

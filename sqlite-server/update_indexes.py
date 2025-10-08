@@ -31,15 +31,11 @@ class UpdateIndexes:
         return self.commit(cursor)
 
     def insert_project(self, cursor, projectName):
-        # Insert project
         cursor.execute("SELECT id FROM projects WHERE name = ?", (projectName,))
         existing_project = cursor.fetchone()
         if existing_project:
-            print(f"Project already exists: {projectName}")
             project_id = existing_project[0]
         else:
-            # Insert project
-            print(f"Inserting project: {projectName}")
             cursor.execute(
                 "INSERT INTO projects (name) VALUES (?)", (projectName,)
             )
@@ -47,15 +43,11 @@ class UpdateIndexes:
         return project_id
 
     def insert_document(self, cursor, project_id, document):
-        # Insert document
-        # Check if the document with same path exists
         cursor.execute("SELECT id FROM documents WHERE path = ?", (document,))
         existing_document = cursor.fetchone()
         if existing_document:
-            print(f"Document already exists: {document}")
             document_id = existing_document[0]
         else:
-            print(f"Inserting document: {document}")
             cursor.execute(
                 "INSERT INTO documents (project_id, path) VALUES (?, ?)",
                 (project_id, document),
@@ -65,9 +57,7 @@ class UpdateIndexes:
     
     def insert_classes(self, cursor, document_id, classes):
         class_id_map = {}
-        # Insert classes
         for cls in classes:
-            # Check if class exists
             cursor.execute("SELECT id FROM classes WHERE name = ?", (cls,))
             existing_class = cursor.fetchone()
             if existing_class:
@@ -85,7 +75,6 @@ class UpdateIndexes:
     
     def insert_methods(self, cursor, methods, class_id_map):
         for method in methods:
-            # Check if method exists
             cursor.execute("SELECT id FROM methods WHERE signature = ?", (method["Signature"],))
             existing_method = cursor.fetchone()
             method_id = None
