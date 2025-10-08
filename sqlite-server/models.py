@@ -1,6 +1,6 @@
 
 from pydantic import BaseModel
-
+from typing import List
 
 class MethodsBody(BaseModel):
     Signature: str
@@ -13,12 +13,12 @@ class CallsBody(BaseModel):
 class ProjectBody(BaseModel):
     Project: str
     Document: str
-    Classes: list[str]
-    Methods: list[MethodsBody]
-    Calls: list[CallsBody]
+    Classes: List[str] = []
+    Methods: List[MethodsBody] = []
+    Calls: List[CallsBody] = []
 
 class UpdateIndexesRequest(BaseModel):
-    projects: list[ProjectBody]
+    projects: List[ProjectBody] = []
 
 class CallsResponseBody(BaseModel):
     id: int # Method id 
@@ -35,8 +35,8 @@ class FetchAllResponse(BaseModel):
     method_name: str
     method_signature: str
     method_body: str
-    calles: list[CallsResponseBody] # Methods that this method calls
-    callers: list[CallsResponseBody] # Methods that call this method
+    callees: List[CallsResponseBody] = [] # Methods that this method calls
+    callers: List[CallsResponseBody] = [] # Methods that call this method
 
 class ProjectsResponse(BaseModel):
     id: int

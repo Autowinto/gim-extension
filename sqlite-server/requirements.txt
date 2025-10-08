@@ -1,2 +1,0 @@
-fastapi[standard]==0.118.1
-pypika==0.48.9

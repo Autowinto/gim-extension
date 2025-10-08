@@ -1,0 +1,10 @@
+[project]
+name = "gim-sqlite-server"
+version = "0.1.0"
+description = "SQLite server for the GIM VS Code extension."
+requires-python = ">=3.8"
+readme = "README.md"
+dependencies = [
+  "fastapi[standard]==0.118.1",
+  "pypika==0.48.9",
+]
