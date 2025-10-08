@@ -4,37 +4,63 @@ import * as path from 'node:path'
 import axios from 'axios'
 import * as vscode from 'vscode'
 
-let aiOutputChannel: vscode.OutputChannel
+let gimOutputChannel: vscode.OutputChannel
 
 export function activate(context: vscode.ExtensionContext) {
   // Initial update indexes on activation
-  updateIndexes()
 
-  aiOutputChannel = vscode.window.createOutputChannel('GIM - AI SERVER')
+  gimOutputChannel = vscode.window.createOutputChannel('GIM')
 
-  aiOutputChannel.appendLine('Starting AI Server...')
-  aiOutputChannel.show(true)
+  gimOutputChannel.appendLine('Starting AI Server...')
+  gimOutputChannel.show(true)
   const extensionPath = context.extensionPath
   exec('uv sync')
-  const process = spawn('uv', ['run', 'main.py'], {
+  const ai = spawn('uv', ['run', 'main.py'], {
     cwd: `${extensionPath}/ai-server`,
   })
 
-  process.stdout.on('data', (data) => {
-    aiOutputChannel.append(data.toString())
+  ai.stdout.on('data', (data) => {
+    gimOutputChannel.append(data.toString())
   })
 
-  process.stderr?.on('data', (data) => {
-    aiOutputChannel.append(`[stderr] ${data.toString()}`)
+  ai.stderr?.on('data', (data) => {
+    gimOutputChannel.append(`[stderr] ${data.toString()}`)
   })
 
-  process.on('error', (err) => {
-    aiOutputChannel.appendLine(`[error] Failed to start: ${err.message}`)
+  ai.on('error', (err) => {
+    gimOutputChannel.appendLine(`[error] Failed to start: ${err.message}`)
     vscode.window.showErrorMessage(`Failed to start uvicorn: ${err.message}`)
   })
 
-  process.on('close', (code) => {
-    aiOutputChannel.appendLine(`[exit] Uvicorn exited with code ${code}`)
+  ai.on('close', (code) => {
+    gimOutputChannel.appendLine(`[exit] Uvicorn exited with code ${code}`)
+  })
+
+  const roslyn = spawn('dotnet', ['run', 'server'], {
+    cwd: `${extensionPath}/roslyn-analyzer/Analyzer`,
+  })
+
+  roslyn.on('spawn', () => {
+    setTimeout(() => {
+      updateIndexes()
+    }, 5000)
+  })
+
+  roslyn.stdout.on('data', (data) => {
+    gimOutputChannel.append(data.toString())
+  })
+
+  roslyn.stderr?.on('data', (data) => {
+    gimOutputChannel.append(`[stderr] ${data.toString()}`)
+  })
+
+  roslyn.on('error', (err) => {
+    gimOutputChannel.appendLine(`[error] Failed to start Roslyn service: ${err.message}`)
+    vscode.window.showErrorMessage(`Failed to start Roslyn service: ${err.message}`)
+  })
+
+  roslyn.on('close', (code) => {
+    gimOutputChannel.appendLine(`[exit] Roslyn service exited with code ${code}`)
   })
 
   context.subscriptions.push(

@@ -22,13 +22,7 @@ if (args.Length > 0 && args[0].ToLower() == "server")
     var cts = new CancellationTokenSource();
     var listenTask = Task.Run(() => ListenForRequests(listener, cts.Token));
 
-    Console.WriteLine("Press any key to exit.");
-    Console.ReadKey();
-
-    cts.Cancel();
-    listener.Stop();
     await listenTask;
-    listener.Close();
 }
 else
 {
