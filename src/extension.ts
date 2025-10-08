@@ -1,11 +1,42 @@
+import { exec, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import axios from 'axios'
 import * as vscode from 'vscode'
 
+let aiOutputChannel: vscode.OutputChannel
+
 export function activate(context: vscode.ExtensionContext) {
   // Initial update indexes on activation
   updateIndexes()
+
+  aiOutputChannel = vscode.window.createOutputChannel('GIM - AI SERVER')
+
+  aiOutputChannel.appendLine('Starting AI Server...')
+  aiOutputChannel.show(true)
+  const extensionPath = context.extensionPath
+  exec('uv sync')
+  const process = spawn('uv', ['run', 'main.py'], {
+    cwd: `${extensionPath}/ai-server`,
+  })
+
+  process.stdout.on('data', (data) => {
+    aiOutputChannel.append(data.toString())
+  })
+
+  process.stderr?.on('data', (data) => {
+    aiOutputChannel.append(`[stderr] ${data.toString()}`)
+  })
+
+  process.on('error', (err) => {
+    aiOutputChannel.appendLine(`[error] Failed to start: ${err.message}`)
+    vscode.window.showErrorMessage(`Failed to start uvicorn: ${err.message}`)
+  })
+
+  process.on('close', (code) => {
+    aiOutputChannel.appendLine(`[exit] Uvicorn exited with code ${code}`)
+  })
+
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'gim.update-indexes',
