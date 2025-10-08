@@ -167,7 +167,6 @@ def fetch_all() -> FetchAllResponse:
                 .groupby(method.id)
 
 
-            print(str(q))
             cursor.execute(str(q))
             rows = cursor.fetchall()
 
