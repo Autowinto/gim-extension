@@ -1,9 +1,3 @@
-from pydantic import BaseModel
-
-
-class UpdateIndexesRequest(BaseModel):
-    projects: list[object]
-
 # Helper class to process the update of a single project at a time
 class UpdateIndexes: 
     def __init__(self, body: object, conn=None):

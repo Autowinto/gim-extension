@@ -3,7 +3,8 @@ import json
 from contextlib import contextmanager
 from tables import Tables
 from fastapi import FastAPI
-from update_indexes import UpdateIndexes, UpdateIndexesRequest
+from update_indexes import UpdateIndexes
+from models import ClassesResponse, DocumentsResponse, MethodCallsResponse, MethodsResponse, UpdateIndexesRequest, FetchAllResponse, ProjectsResponse
 from contextlib import asynccontextmanager
 
 DB_NAME = "database.db"
@@ -71,78 +72,69 @@ def fetch_from_table(table_name, query=None):
 
 
 @app.get("/fetch-projects")
-def fetch_projects():
+def fetch_projects() -> list[ProjectsResponse]:
     return fetch_from_table("projects")
 
 
 @app.get("/fetch-documents")
-def fetch_documents():
+def fetch_documents() -> list[DocumentsResponse]:
     return fetch_from_table("documents")
 
 
 @app.get("/fetch-classes")
-def fetch_classes():
+def fetch_classes() -> list[ClassesResponse]:
     return fetch_from_table("classes")
 
 
 @app.get("/fetch-methods")
-def fetch_methods():
+def fetch_methods() -> list[MethodsResponse]:
     return fetch_from_table("methods")
 
 
 @app.get("/fetch-method-calls")
-def fetch_method_calls():
+def fetch_method_calls() -> list[MethodCallsResponse]:
     return fetch_from_table("method_calls")
 
 
 @app.get("/fetch-all")
-def fetch_all():
+def fetch_all() -> list[FetchAllResponse]:
     try:
         with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            # Fetches all relevant data in one go, including method calls as nested arrays.
-            select_query = '''
+            query = '''
                 SELECT
                     prj.id as project_id, prj.name as project_name,
                     doc.id as document_id, doc.path as document_path,
                     class.id as class_id, class.name as class_name,
-                    method.id as method_id,
-                    method.name as method_name,
-                    method.signature as method_signature,
-                    method.body as method_body,
+                    method.id as method_id, method.name as method_name,
+                    method.signature as method_signature, method.body as method_body,
                     JSON_GROUP_ARRAY(
-                        DISTINCT JSON_OBJECT('method_id', callee_method.id, 'signature', callee_method.signature)
+                        DISTINCT JSON_OBJECT('id', callee_method.id, 'signature', callee_method.signature)
                     ) FILTER (WHERE callee_method.id IS NOT NULL) as callees,
                     JSON_GROUP_ARRAY(
-                        DISTINCT JSON_OBJECT('method_id', caller_method.id, 'signature', caller_method.signature)
+                        DISTINCT JSON_OBJECT('id', caller_method.id, 'signature', caller_method.signature)
                     ) FILTER (WHERE caller_method.id IS NOT NULL) as callers
+                FROM methods as method
+                    INNER JOIN classes as class ON method.class_id = class.id
+                    INNER JOIN documents as doc ON class.document_id = doc.id
+                    INNER JOIN projects as prj ON doc.project_id = prj.id
+                    LEFT JOIN method_calls as callee_join ON method.id = callee_join.caller_id
+                    LEFT JOIN methods as callee_method ON callee_join.callee_id = callee_method.id
+                    LEFT JOIN method_calls as caller_join ON method.id = caller_join.callee_id
+                    LEFT JOIN methods as caller_method ON caller_join.caller_id = caller_method.id
+                    GROUP BY method.id
             '''
-            query = '''
-            FROM methods as method
-                INNER JOIN classes as class ON method.class_id = class.id
-                INNER JOIN documents as doc ON class.document_id = doc.id
-                INNER JOIN projects as prj ON doc.project_id = prj.id
-                LEFT JOIN method_calls as callee_join ON method.id = callee_join.caller_id
-                LEFT JOIN methods as callee_method ON callee_join.callee_id = callee_method.id
-                LEFT JOIN method_calls as caller_join ON method.id = caller_join.callee_id
-                LEFT JOIN methods as caller_method ON caller_join.caller_id = caller_method.id
-                GROUP BY method.id
-            '''
-            cursor.execute(
-                f'''
-                        {select_query}
-                        {query}
-                '''
-            )
+            cursor.execute(query)
             rows = cursor.fetchall()
-            result = []
-            for row in rows:
+
+            def process_row(row):
                 row_dict = dict(row)
-                row_dict['callees'] = json.loads(row_dict['callees']) if row_dict['callees'] else []
-                row_dict['callers'] = json.loads(row_dict['callers']) if row_dict['callers'] else []
-                result.append(row_dict)
-            return result
+                row_dict['callees'] = json.loads(row_dict['callees'] or '[]')
+                row_dict['callers'] = json.loads(row_dict['callers'] or '[]')
+                return row_dict
+
+            return [process_row(row) for row in rows]
     except sqlite3.Error as e:
         return {"error": str(e)}
 
@@ -152,19 +144,18 @@ async def update_indexes(body: UpdateIndexesRequest):
     # Upload data to database
     try:
         projects: list[object] = body.projects  # List of projects
-
+        results = []
         try:
             with get_db_connection() as conn:
                 for project in projects:
                     updater = UpdateIndexes(project, conn=conn)
                     result = updater.process()
                     if "error" in result:
-                        return result
+                        return result # Return early on first error
+                    results.append(result)
 
-                # Respond with success
-                return result;
+            return results
         except Exception as e:
             return {"error": str(e)}
     except (sqlite3.Error, json.JSONDecodeError) as e:
         return {"error": str(e)}
-
