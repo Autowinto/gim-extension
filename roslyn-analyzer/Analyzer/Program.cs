@@ -237,6 +237,21 @@ class ApiWalker : CSharpSyntaxWalker
 
     private string? _currentMethod;
 
+    // 👇 Custom format: include return type, parameter names, and containing type
+    private static readonly SymbolDisplayFormat SignatureFormat = new SymbolDisplayFormat(
+        memberOptions:
+            SymbolDisplayMemberOptions.IncludeParameters |
+            SymbolDisplayMemberOptions.IncludeContainingType |
+            SymbolDisplayMemberOptions.IncludeType,
+        parameterOptions:
+            SymbolDisplayParameterOptions.IncludeType |
+            SymbolDisplayParameterOptions.IncludeName,
+        genericsOptions:
+            SymbolDisplayGenericsOptions.IncludeTypeParameters,
+        miscellaneousOptions:
+            SymbolDisplayMiscellaneousOptions.UseSpecialTypes
+    );
+
     public ApiWalker(SemanticModel model) : base(SyntaxWalkerDepth.Token) => _model = model;
 
     public override void VisitClassDeclaration(ClassDeclarationSyntax node)
@@ -249,7 +264,7 @@ class ApiWalker : CSharpSyntaxWalker
     public override void VisitMethodDeclaration(MethodDeclarationSyntax node)
     {
         var sym = _model.GetDeclaredSymbol(node);
-        _currentMethod = sym?.ToDisplayString();
+        _currentMethod = sym?.ToDisplayString(SignatureFormat); // 👈 use our new format
 
         if (_currentMethod != null)
         {
@@ -258,8 +273,8 @@ class ApiWalker : CSharpSyntaxWalker
                 body = node.Body.NormalizeWhitespace().ToFullString();
             else if (node.ExpressionBody != null)
                 body = node.ExpressionBody.NormalizeWhitespace().ToFullString();
-            body = body.Replace("\r\n", "\n");
 
+            body = body.Replace("\r\n", "\n");
             Methods.Add((_currentMethod, body));
         }
 
