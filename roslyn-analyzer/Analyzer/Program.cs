@@ -7,6 +7,38 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.AspNetCore.OpenApi;
+
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+var app = builder.Build();
+
+app.UseSwagger(context =>
+{
+    context.RouteTemplate = "docs/{documentName}/openapi.json";
+});
+
+app.UseSwaggerUI(context =>
+{
+    context.SwaggerEndpoint("/docs/v1/openapi.json", "Roslyn API");
+    context.RoutePrefix = "docs";  // serve Swagger UI at /docs
+});
+
+app.MapGet("/update-codebase-indices", UpdateCodebaseIndices).WithOpenApi();
+
+Console.WriteLine("Startup Beginning");
+app.Urls.Add("http://localhost:8080");
+
+app.Run();
+
+Console.WriteLine("Startup Finished");
+
+void UpdateCodebaseIndices()
+{
+    
+}
 
 if (!MSBuildLocator.IsRegistered)
     MSBuildLocator.RegisterDefaults();
