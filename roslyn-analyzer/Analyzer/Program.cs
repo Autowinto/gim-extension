@@ -15,9 +15,9 @@ if (args.Length > 0 && args[0].ToLower() == "server")
 {
     // The code will now act as a simple HTTP server on port 8080
     var listener = new HttpListener();
-    listener.Prefixes.Add("http://localhost:8080/");
+    listener.Prefixes.Add("http://127.0.0.1:8080/");
     listener.Start();
-    Console.WriteLine("Listening for requests on http://localhost:8080/...");
+    Console.WriteLine("Listening for requests on http://127.0.0.1:8080/...");
 
     var cts = new CancellationTokenSource();
     var listenTask = Task.Run(() => ListenForRequests(listener, cts.Token));
@@ -91,12 +91,14 @@ static async Task ProcessRequestAsync(HttpListenerContext context)
             var body = await reader.ReadToEndAsync();
             var payload = JsonSerializer.Deserialize<Dictionary<string, string>>(body);
 
+            Console.WriteLine("Processing update-codebase-indexes request...");
             // if payload does not exist, we return 400
             if (payload == null || !payload.TryGetValue("projectPath", out var targetPath))
             {
                 response.StatusCode = (int)HttpStatusCode.BadRequest;
                 var errorJson = JsonSerializer.Serialize(new { error = "Missing 'projectPath' in request body." });
                 var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
+                Console.WriteLine("Error: Missing 'projectPath' in request body.");
                 response.ContentLength64 = errorBuffer.Length;
                 await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
                 return;
@@ -127,7 +129,28 @@ static async Task ProcessRequestAsync(HttpListenerContext context)
             var outputPath = Path.GetFullPath(outputFilename);
             
             await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(analysisResults, options));
-            
+
+            // Send request to sql server on 1270.0.0.1:8000
+            using var httpClient = new HttpClient();
+            var sqlServerPayload = new
+            { projects = analysisResults };
+            var sqlServerContent = new StringContent(JsonSerializer.Serialize(sqlServerPayload, options), Encoding.UTF8, "application/json");
+            try
+            {
+                var sqlServerRequest = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:8000/update-indexes")
+                {
+                    Content = sqlServerContent
+                };
+                var sqlServerResponse = await httpClient.SendAsync(sqlServerRequest);
+                if (!sqlServerResponse.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Warning: SQL server responded with status code {sqlServerResponse.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not connect to SQL server: {ex.Message}");
+            }
             // Send success response
             var successResponse = JsonSerializer.Serialize(new { 
                 success = true, 
