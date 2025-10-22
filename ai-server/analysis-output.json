@@ -8,33 +8,33 @@
     ],
     "Methods": [
       {
-        "Signature": "DemoLib.Calculator.Add(int, int)",
+        "Signature": "int Calculator.Add(int a, int b)",
         "Body": "=> a + b"
       },
       {
-        "Signature": "DemoLib.Calculator.Subtract(int, int)",
+        "Signature": "int Calculator.Subtract(int a, int b)",
         "Body": "=> a - b"
       },
       {
-        "Signature": "DemoLib.Calculator.Multiply(int, int)",
+        "Signature": "int Calculator.Multiply(int a, int b)",
         "Body": "=> a * b"
       },
       {
-        "Signature": "DemoLib.Calculator.Divide(int, int)",
+        "Signature": "double Calculator.Divide(int a, int b)",
         "Body": "{\n    if (b == 0)\n        throw new DivideByZeroException();\n    int x = Add(1, 1);\n    return (double)a / b;\n}"
       },
       {
-        "Signature": "DemoLib.MathUtils.Square(int)",
+        "Signature": "int MathUtils.Square(int x)",
         "Body": "=> x * x"
       },
       {
-        "Signature": "DemoLib.MathUtils.Sum(params int[])",
+        "Signature": "int MathUtils.Sum(int[] numbers)",
         "Body": "{\n    int total = 0;\n    foreach (var n in numbers)\n        total += n;\n    return total;\n}"
       }
     ],
     "Calls": [
       {
-        "Caller": "DemoLib.Calculator.Divide(int, int)",
+        "Caller": "double Calculator.Divide(int a, int b)",
         "Callee": "DemoLib.Calculator.Add"
       }
     ]
@@ -47,57 +47,57 @@
     ],
     "Methods": [
       {
-        "Signature": "Program.Main()",
+        "Signature": "void Program.Main()",
         "Body": "{\n    var calc = new Calculator();\n    int a = 10, b = 5;\n    Console.WriteLine($\"Add: {calc.Add(a, b)}\");\n    Console.WriteLine($\"Subtract: {calc.Subtract(a, b)}\");\n    Console.WriteLine($\"Multiply: {calc.Multiply(a, b)}\");\n    Console.WriteLine($\"Divide: {calc.Divide(a, b)}\");\n    Console.WriteLine($\"Square: {MathUtils.Square(a)}\");\n    Console.WriteLine($\"Sum: {MathUtils.Sum(1, 2, 3, 4, 5)}\");\n}"
       }
     ],
     "Calls": [
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "System.Console.WriteLine"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "DemoLib.Calculator.Add"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "System.Console.WriteLine"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "DemoLib.Calculator.Subtract"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "System.Console.WriteLine"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "DemoLib.Calculator.Multiply"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "System.Console.WriteLine"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "DemoLib.Calculator.Divide"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "System.Console.WriteLine"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "DemoLib.MathUtils.Square"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "System.Console.WriteLine"
       },
       {
-        "Caller": "Program.Main()",
+        "Caller": "void Program.Main()",
         "Callee": "DemoLib.MathUtils.Sum"
       }
     ]
