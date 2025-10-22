@@ -64,32 +64,32 @@ def fetch_from_table(table_name, query=None):
 
 
 @app.get("/fetch-projects")
-def fetch_projects() -> list[ProjectsResponse]:
-    return fetch_from_table("projects")
+def fetch_projects() -> dict[str, list[ProjectsResponse]]:
+    return {"data": fetch_from_table("projects")}
 
 
 @app.get("/fetch-documents")
-def fetch_documents() -> list[DocumentsResponse]:
-    return fetch_from_table("documents")
+def fetch_documents() -> dict[str, list[DocumentsResponse]]:
+    return {"data": fetch_from_table("documents")}
 
 
 @app.get("/fetch-classes")
-def fetch_classes() -> list[ClassesResponse]:
-    return fetch_from_table("classes")
+def fetch_classes() -> dict[str, list[ClassesResponse]]:
+    return {"data": fetch_from_table("classes")}
 
 
 @app.get("/fetch-methods")
-def fetch_methods() -> list[MethodsResponse]:
-    return fetch_from_table("methods")
+def fetch_methods() -> dict[str, list[MethodsResponse]]:
+    return {"data": fetch_from_table("methods")}
 
 
 @app.get("/fetch-method-calls")
-def fetch_method_calls() -> list[MethodCallsResponse]:
-    return fetch_from_table("method_calls")
+def fetch_method_calls() -> dict[str, list[MethodCallsResponse]]:
+    return {"data": fetch_from_table("method_calls")}
 
 
 @app.get("/fetch-all")
-def fetch_all() -> list[FetchAllResponse]:
+def fetch_all() -> dict[str, list[FetchAllResponse]]:
     try:
         with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -167,7 +167,7 @@ def fetch_all() -> list[FetchAllResponse]:
                 row_dict['callers'] = json.loads(row_dict['callers'] or '[]')
                 return row_dict
             
-            return [process_row(row) for row in rows]
+            return {"data": [process_row(row) for row in rows]}
     except sqlite3.Error as e:
         return {"error": str(e)}
 
