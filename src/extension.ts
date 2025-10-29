@@ -73,7 +73,7 @@ async function docstringFromSelection() {
   } = {
     file_name: editor.document.fileName,
     signature: 'DemoLib.Calculator.Add(int, int)',
-    model_name: 'deepseek-r1:1.5b',
+    model_name: '',
   }
 
   try {
