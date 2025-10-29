@@ -72,7 +72,7 @@ async function docstringFromSelection() {
     model_name: string
   } = {
     file_name: editor.document.fileName,
-    signature: 'DemoLib.Calculator.Add(int, int)',
+    signature: '',
     model_name: '',
   }
 
