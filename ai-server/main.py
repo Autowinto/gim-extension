@@ -15,8 +15,9 @@ class Docstring(BaseModel):
 @app.post("/docstring")
 async def docstring(body: Docstring):
     data = get_indexed_codebase()
-    method = get_method_from_signature(body.signature, body.file_name, data)
-    sys_prompt, user_prompt = get_docstring_prompts(method)
+    method, id = get_method_from_signature(body.signature, body.file_name, data, include_method_id=True)
+    used_methods = get_used_methods(id, data)
+    sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
 @app.get("/stream")
