@@ -27,6 +27,8 @@ async def docstring(body: Docstring):
     method, id = get_method_from_signature(body.signature, body.file_name, data, include_method_id=True)
     used_methods = get_used_methods(id, data)
     sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
+    print(sys_prompt)
+    print(user_prompt)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
 @app.get("/stream")
