@@ -1,11 +1,12 @@
 import sqlite3
 import json
 from contextlib import contextmanager
+from typing import List
 from tables import Tables
 from fastapi import FastAPI
 from update_indexes import UpdateIndexes
 from pypika import Query, Table, terms
-from models import ClassesResponse, DocumentsResponse, MethodCallsResponse, MethodsResponse, UpdateIndexesRequest, FetchAllResponse, ProjectsResponse
+from models import ClassesResponse, DocumentsResponse, MethodCallsResponse, MethodsResponse, ProjectBody, FetchAllResponse, ProjectsResponse
 from contextlib import asynccontextmanager
 import uvicorn
 
@@ -173,10 +174,10 @@ def fetch_all() -> dict[str, list[FetchAllResponse]]:
 
 
 @app.post("/update-indexes")
-async def update_indexes(body: UpdateIndexesRequest):
+async def update_indexes(projects: List[ProjectBody]):
     # Upload data to database
     try:
-        projects = body.projects  # This is a list of ProjectBody model objects
+        # The 'projects' argument is now directly the list of ProjectBody model objects.
         results = []
         try:
             print(f"[SQLITE SERVER] Updating indexes for {len(projects)} project(s)...")

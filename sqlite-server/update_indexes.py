@@ -21,10 +21,10 @@ class UpdateIndexes:
         project_id = self.insert_project(cursor, self.projectName)
         document_id = self.insert_document(cursor, project_id, self.document)
         class_id_map = self.insert_classes(cursor, document_id, self.classes)
-        self.insert_methods(cursor, self.methods, class_id_map, project_id)
-        self.insert_method_calls(cursor, self.calls)
+        self.insert_methods(cursor, self.methods, class_id_map, self.projectName)
+        self.insert_method_calls(cursor, self.calls, class_id_map)
         return self.commit(cursor)
-
+    
     def insert_project(self, cursor, projectName):
         cursor.execute("SELECT id FROM projects WHERE name = ?", (projectName,))
         existing_project = cursor.fetchone()
@@ -56,10 +56,8 @@ class UpdateIndexes:
             cursor.execute("SELECT id FROM classes WHERE name = ?", (cls,))
             existing_class = cursor.fetchone()
             if existing_class:
-                print(f"Class already exists: {cls}")
                 class_id = existing_class[0]
             else:
-                print(f"Inserting class: {cls}")
                 cursor.execute(
                     "INSERT INTO classes (document_id, name) VALUES (?, ?)",
                     (document_id, cls),
@@ -68,23 +66,24 @@ class UpdateIndexes:
             class_id_map[cls] = class_id
         return class_id_map
     
-    def insert_methods(self, cursor, methods, class_id_map, project_id):
+    def insert_methods(self, cursor, methods, class_id_map, projectName):
         for method in methods:
             cursor.execute("SELECT id FROM methods WHERE signature = ?", (method.Signature,))
             existing_method = cursor.fetchone()
             method_id = None
             body = method.Body
             if existing_method:
-                print(f"Method already exists, updating body: {method.Signature}")
                 method_id = existing_method[0]
                 cursor.execute("UPDATE methods SET body = ? WHERE id = ?", (body, method_id))
-                continue  # Skip inserting if method already exists
             else:
-                print(f"Inserting method: {method.Signature}")
                 signature = method.Signature
-                class_name = ".".join(signature.split(".")[:-1])
+                class_name = ".".join(signature.split(".")[:-1]).split(" ")[-1]
                 method_name = signature.split(".")[-1]
-                class_id = class_id_map.get(class_name)
+                class_id = class_id_map.get(f"{projectName}.{class_name}")
+                if class_id is None:
+                    # Fall back if no project prefix
+                    class_id = class_id_map.get(class_name)
+                
                 if class_id:
                     cursor.execute(
                         "INSERT INTO methods (class_id, name, signature, body) VALUES (?, ?, ?, ?)",
@@ -92,19 +91,37 @@ class UpdateIndexes:
                     )
             
                 
-    def insert_method_calls(self, cursor, method_calls):
+    def insert_method_calls(self, cursor, method_calls, class_id_map):
         for call in method_calls:
             caller_signature = call.Caller
-            callee_signature = call.Callee
+            callee_prefixes = call.Callee.split(".");
+            # It is, <project-name or internal areas like "system">.<class-name>.<method-name>
+            callee_proj_name = callee_prefixes[0]
+            callee_class_name = callee_prefixes[1]
+            callee_method_name = callee_prefixes[2]
             cursor.execute(
                 "SELECT id FROM methods WHERE signature = ?",
                 (caller_signature,),
             )
             caller_row = cursor.fetchone()
             # The callee signature might be incomplete, so we use LIKE
+            classId = class_id_map.get(f"{callee_proj_name}.{callee_class_name}")
+            if classId is None:
+                classId = class_id_map.get(callee_class_name)
+
+            if classId is None:
+                # try sql query to find class id
+                cursor.execute(
+                    "SELECT id FROM classes WHERE name = ?",
+                    (f"{callee_proj_name}.{callee_class_name}",),
+                )
+                class_row = cursor.fetchone()
+                if class_row:
+                    classId = class_row[0]
+
             cursor.execute(
-                "SELECT id FROM methods WHERE signature LIKE ?",
-                (callee_signature + "%",),
+                "SELECT id FROM methods WHERE class_id = ? AND name like ?",
+                (classId, f"{callee_method_name}%"),
             )
             callee_row = (
                 cursor.fetchone()
@@ -112,12 +129,18 @@ class UpdateIndexes:
             if caller_row and callee_row:
                 caller_id = caller_row[0]
                 callee_id = callee_row[0]
+                
                 cursor.execute(
-                    "INSERT INTO method_calls (caller_id, callee_id) VALUES (?, ?)",
+                    "SELECT id FROM method_calls WHERE caller_id = ? AND callee_id = ?",
                     (caller_id, callee_id),
                 )
-            else:
-                continue
+
+                if not cursor.fetchone():
+                    print(f"Inserting method call from {caller_signature} to {call.Callee}")
+                    cursor.execute(
+                        "INSERT INTO method_calls (caller_id, callee_id) VALUES (?, ?)",
+                        (caller_id, callee_id),
+                    )
         return
     
     def commit(self, cursor=None):

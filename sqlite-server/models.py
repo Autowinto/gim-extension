@@ -17,9 +17,6 @@ class ProjectBody(BaseModel):
     Methods: List[MethodsBody] = []
     Calls: List[CallsBody] = []
 
-class UpdateIndexesRequest(BaseModel):
-    projects: List[ProjectBody] = []
-
 class CallsResponseBody(BaseModel):
     id: int # Method id 
     signature: str

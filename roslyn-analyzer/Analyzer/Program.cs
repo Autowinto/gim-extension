@@ -132,9 +132,7 @@ static async Task ProcessRequestAsync(HttpListenerContext context)
 
             // Send request to sql server on 1270.0.0.1:8000
             using var httpClient = new HttpClient();
-            var sqlServerPayload = new
-            { projects = analysisResults };
-            var sqlServerContent = new StringContent(JsonSerializer.Serialize(sqlServerPayload, options), Encoding.UTF8, "application/json");
+            var sqlServerContent = new StringContent(JsonSerializer.Serialize(analysisResults, options), Encoding.UTF8, "application/json");
             try
             {
                 var sqlServerRequest = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:8000/update-indexes")
