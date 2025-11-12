@@ -3,7 +3,7 @@ import json
 from contextlib import contextmanager
 from typing import List
 from tables import Tables
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from update_indexes import UpdateIndexes
 from pypika import Query, Table, terms
 from models import ClassesResponse, DocumentsResponse, MethodCallsResponse, MethodsResponse, ProjectBody, FetchAllResponse, ProjectsResponse
@@ -194,6 +194,89 @@ async def update_indexes(projects: List[ProjectBody]):
             return {"error": str(e)}
     except (sqlite3.Error, json.JSONDecodeError) as e:
         return {"error": str(e)}
+
+
+
+# Get method from signature
+@app.get("/method-fromsignature")
+def method_from_signature(signature: str, file_name: str):
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+
+
+        # Define tables
+        methods_table = Table('methods')
+        classes_table = Table('classes')
+        documents_table = Table('documents')
+
+        query = Query.from_(methods_table) \
+            .join(classes_table).on(methods_table.class_id == classes_table.id) \
+            .join(documents_table).on(classes_table.document_id == documents_table.id) \
+            .select(
+                methods_table.id.as_('method_id'),
+                methods_table.signature.as_('method_signature'),
+                methods_table.body.as_('method_body'),
+            ) \
+            .where(
+                (methods_table.signature == signature) &
+                (documents_table.path == file_name)
+            )
+ 
+
+
+        cursor.execute(str(query))
+        row = cursor.fetchone()
+        print(row)
+        if row:
+            dict_row = dict(row)
+            full_method = f'''{dict_row["method_signature"]}\n\t\t{dict_row["method_body"]}'''
+            return {"method": full_method, "method_id": dict_row["method_id"]}
+        else:
+            raise HTTPException(status_code=404, detail="Method not found")
+   
+
+# Example of another function ( WE DONT USE THIS )
+# def get_used_methods(method_id, data):
+#     '''returns the methods called by the method with given id'''
+#     callees = ""
+#     for entry in data["data"]:
+#         if entry["method_id"] == method_id:
+#             for callee in entry["callees"]:
+#                 callees+=(get_method_from_signature(callee["signature"],entry["document_path"],data)+"\n")
+#     return callees
+
+@app.get("/used-methods/{method_id}")
+def used_methods(method_id: int):
+    print("Getting used methods for method_id:", method_id)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+        # First, get the method signature and document path for the given method_id
+        method_calls_table = Table("method_calls")
+        methods_table = Table("methods")
+        documents_table = Table("documents")
+        classes_table = Table("classes")
+
+        print("Fetching used methods for method_id:", method_id)
+        query = Query.from_(method_calls_table) \
+            .join(methods_table).on(method_calls_table.callee_id == methods_table.id) \
+            .join(classes_table).on(methods_table.class_id == classes_table.id) \
+            .join(documents_table).on(classes_table.document_id == documents_table.id) \
+            .select(
+                methods_table.id.as_("method_id"),
+                methods_table.signature.as_("method_signature"),
+                documents_table.path.as_("document_path")
+            ) \
+            .where(method_calls_table.caller_id == method_id) \
+            .groupby(methods_table.id)
+
+        cursor.execute(str(query))
+        rows = cursor.fetchall()
+        print(f"Found {len(rows)} used methods for method_id {method_id}")
+        used_methods = [dict(row) for row in rows]
+        return {"used_methods": used_methods}
+# Get Used Methods
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
