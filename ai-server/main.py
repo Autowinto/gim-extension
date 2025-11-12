@@ -8,32 +8,37 @@ from prompts import *
 
 app = FastAPI()
 
-class Docstring(BaseModel):
+class ReqBody(BaseModel):
     file_name: str
     signature: str
     model_name: str
 
 @app.post("/docstring")
-async def docstring(body: Docstring):
-    data = get_indexed_codebase()
-    method, id = get_method_from_signature(body.signature, body.file_name, data, include_method_id=True)
-    used_methods = get_used_methods(id, data)
+async def docstring(body: ReqBody):
+    method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
     sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
 @app.post("/explain")
-async def docstring(body: Docstring):
-    data = get_indexed_codebase()
-    method, id = get_method_from_signature(body.signature, body.file_name, data, include_method_id=True)
-    used_methods = get_used_methods(id, data)
+async def explain(body: ReqBody):
+    method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
     sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
-    print(sys_prompt)
-    print(user_prompt)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
-@app.get("/stream")
-async def stream_response(model, prompt):
-    return StreamingResponse(generate_response(model=model, sys_prompt="you are an assistant", user_prompt=prompt), media_type="text/event-stream")
+@app.post("/related-code")
+async def related_code(body: ReqBody):
+    method, used_methods = get_methods_for_related_code(body.signature, body.file_name)
+    sys_prompt, user_prompt = get_related_code_prompts(method, used_methods)
+    return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
+
+def get_methods_for_related_code(signature, file_name):
+    data = get_indexed_codebase()
+
+def get_methods_for_prompts(signature, file_name):
+    data = get_indexed_codebase()
+    method, id = get_method_from_signature(signature, file_name, data, include_method_id=True)
+    used_methods = get_used_methods(id, data)
+    return method, used_methods
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=9999, reload=True)

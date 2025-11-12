@@ -25,6 +25,7 @@ async def generate_response(model: str, sys_prompt: str, user_prompt: str) -> As
             yield f"data: {json.dumps({'token': content})}\n\n"
             # yield f"data: {content}\n\n"
     print(data)
+    
 def get_indexed_codebase():
     #response = requests.get("http://127.0.0.1:8000/fetch-all")
     #if response.status_code == 200:
