@@ -198,7 +198,7 @@ async def update_indexes(projects: List[ProjectBody]):
 
 
 # Get method from signature
-@app.get("/method-fromsignature")
+@app.get("/method-from-signature")
 def method_from_signature(signature: str, file_name: str):
     with get_db_connection() as conn:
         cursor = conn.cursor()
