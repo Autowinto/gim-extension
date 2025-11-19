@@ -32,12 +32,11 @@ async def related_code(body: ReqBody):
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
 def get_methods_for_related_code(signature, file_name):
-    data = get_indexed_codebase()
+    pass
 
 def get_methods_for_prompts(signature, file_name):
-    data = get_indexed_codebase()
-    method, id = get_method_from_signature(signature, file_name, data, include_method_id=True)
-    used_methods = get_used_methods(id, data)
+    method, method_id = get_method_from_signature(signature, file_name)
+    used_methods = get_used_methods(method_id)
     return method, used_methods
 
 if __name__ == "__main__":
