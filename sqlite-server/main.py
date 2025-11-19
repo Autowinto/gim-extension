@@ -83,11 +83,9 @@ def fetch_classes() -> dict[str, list[ClassesResponse]]:
 def fetch_methods() -> dict[str, list[MethodsResponse]]:
     return {"data": fetch_from_table("methods")}
 
-
 @app.get("/fetch-method-calls")
 def fetch_method_calls() -> dict[str, list[MethodCallsResponse]]:
     return {"data": fetch_from_table("method_calls")}
-
 
 @app.get("/fetch-all")
 def fetch_all() -> dict[str, list[FetchAllResponse]]:
@@ -234,7 +232,28 @@ def method_from_signature(signature: str, file_name: str):
             return {"method": full_method, "method_id": dict_row["method_id"]}
         else:
             raise HTTPException(status_code=404, detail="Method not found")
-   
+
+@app.get("/method/{method_id}")
+def get_method(method_id: int):
+    print("Getting method with id:", method_id)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+        methods_table = Table("methods")
+        query = Query.from_(methods_table) \
+            .select(
+                methods_table.id.as_("method_id"),
+                methods_table.signature.as_("method_signature"),
+                methods_table.body.as_("method_body")
+            ) \
+            .where(methods_table.id == method_id)
+        cursor.execute(str(query))
+        row = cursor.fetchone()
+        if row: 
+            dict_row = dict(row)
+            return dict_row
+        else:
+            raise HTTPException(status_code=404, detail="Method not found")
 
 # Example of another function ( WE DONT USE THIS )
 # def get_used_methods(method_id, data):
@@ -276,7 +295,37 @@ def used_methods(method_id: int):
         print(f"Found {len(rows)} used methods for method_id {method_id}")
         used_methods = [dict(row) for row in rows]
         return {"used_methods": used_methods}
-# Get Used Methods
+
+@app.get("/related-methods/{method_id}")
+def related_methods(method_id: int):
+    print("Getting related methods for method_id:", method_id)
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.row_factory = sqlite3.Row
+        # First, get the method signature and document path for the given method_id
+        method_calls_table = Table("method_calls")
+        methods_table = Table("methods")
+        classes_table = Table("classes")
+        documents_table = Table("documents")
+
+        print("Fetching related methods for method_id:", method_id)
+        query = Query.from_(method_calls_table) \
+            .join(methods_table).on(method_calls_table.caller_id == methods_table.id) \
+            .join(classes_table).on(methods_table.class_id == classes_table.id) \
+            .join(documents_table).on(classes_table.document_id == documents_table.id) \
+            .select(
+                methods_table.id.as_("method_id"),
+                methods_table.signature.as_("method_signature"),
+                documents_table.path.as_("document_path")
+            ) \
+            .where(method_calls_table.callee_id == method_id) \
+            .groupby(methods_table.id)
+
+        cursor.execute(str(query))
+        rows = cursor.fetchall()
+        print(f"Found {len(rows)} related methods for method_id {method_id}")
+        related_methods = [dict(row) for row in rows]
+        return {"related_methods": related_methods}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
