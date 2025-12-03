@@ -15,12 +15,14 @@ class ReqBody(BaseModel):
 
 @app.post("/docstring")
 async def docstring(body: ReqBody):
+    '''Generate docstring for given method in the given file'''
     method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
     sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
 @app.post("/explain")
 async def explain(body: ReqBody):
+    '''Explain the code in the given signature in the given file'''
     method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
     sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
