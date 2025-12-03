@@ -29,6 +29,11 @@ async def explain(body: ReqBody):
 
 @app.post("/related-code")
 async def related_code(body: ReqBody):
+    #get signature and filename from frontend
+    #use /get-method-from-signature to get id
+    #use /related-methods to get signature and files
+    #use /get-method-from-signature to get more data about used methods
+    #return this in some format
     method, used_methods = get_methods_for_related_code(body.signature, body.file_name)
     sys_prompt, user_prompt = get_related_code_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
