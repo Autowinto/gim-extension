@@ -12,6 +12,55 @@ import uvicorn
 
 DB_NAME = "database.db"
 
+description = """
+This API provides endpoints to interact with a SQLite database for managing projects, documents, classes, methods, and method calls.
+It allows fetching and updating indexed data, retrieving methods by signature or ID, and exploring relationships between methods such as callers and callees. 
+The server ensures the database schema is initialized on startup and supports bulk updates of project indexes.
+"""
+
+tags_metadata = [
+    {
+        "name": "Projects",
+        "description": "Operations related to projects in the database.",
+    },
+    {
+        "name": "Documents",
+        "description": "Operations related to documents in the database.",
+    },
+    {
+        "name": "Classes",
+        "description": "Operations related to classes in the database.",
+    },
+    {
+        "name": "Methods",
+        "description": "Operations related to methods in the database.",
+    },
+    {
+        "name": "Method Calls",
+        "description": "Operations related to method calls in the database.",
+    },
+    {
+        "name": "Fetch All",
+        "description": "Fetch comprehensive data including projects, documents, classes, methods, and their relationships.",
+    },
+    {
+        "name": "Update Indexes",
+        "description": "Update indexes for projects by uploading project data.",
+    },
+    {
+        "name": "Method Retrieval",
+        "description": "Retrieve methods by signature or ID, and explore related methods.",
+    },
+    {
+        "name": "Used Methods",
+        "description": "Retrieve methods that are called by a specific method.",
+    },
+    {
+        "name": "Related Methods",
+        "description": "Retrieve methods that call a specific method.",
+    }
+]
+
 # Makes sure that each time the server starts up, the database is initialized with the corret tables, it does not drop old tables.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,7 +69,7 @@ async def lifespan(app: FastAPI):
     print("Shutting down...")
     with get_db_connection() as conn:
         conn.close()
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="SQLite Server", openapi_tags=tags_metadata, description=description,lifespan=lifespan)
 
 @contextmanager
 def get_db_connection():
@@ -64,31 +113,49 @@ def fetch_from_table(table_name, query=None):
 
 
 
-@app.get("/fetch-projects")
+@app.get("/fetch-projects", tags=["Projects"])
 def fetch_projects() -> dict[str, list[ProjectsResponse]]:
+    """
+    Fetch projects from the database.
+    """
     return {"data": fetch_from_table("projects")}
 
 
-@app.get("/fetch-documents")
+@app.get("/fetch-documents", tags=["Documents"])
 def fetch_documents() -> dict[str, list[DocumentsResponse]]:
+    """
+    Fetch documents from the database.
+    """
     return {"data": fetch_from_table("documents")}
 
 
-@app.get("/fetch-classes")
+@app.get("/fetch-classes", tags=["Classes"])
 def fetch_classes() -> dict[str, list[ClassesResponse]]:
+    """
+    Fetch classes from the database.
+    """
     return {"data": fetch_from_table("classes")}
 
 
-@app.get("/fetch-methods")
+@app.get("/fetch-methods", tags=["Methods"])
 def fetch_methods() -> dict[str, list[MethodsResponse]]:
+    """
+    Fetch methods from the database.
+    """
     return {"data": fetch_from_table("methods")}
 
-@app.get("/fetch-method-calls")
+@app.get("/fetch-method-calls", tags=["Method Calls"])
 def fetch_method_calls() -> dict[str, list[MethodCallsResponse]]:
+    """
+    Fetch method calls from the database.
+    """
     return {"data": fetch_from_table("method_calls")}
 
-@app.get("/fetch-all")
+@app.get("/fetch-all", tags=["Fetch All"])
 def fetch_all() -> dict[str, list[FetchAllResponse]]:
+    """
+    Fetch all data including projects, documents, classes, methods, and their relationships.
+    """
     try:
         with get_db_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -171,8 +238,11 @@ def fetch_all() -> dict[str, list[FetchAllResponse]]:
         return {"error": str(e)}
 
 
-@app.post("/update-indexes")
+@app.post("/update-indexes", tags=["Update Indexes"])
 async def update_indexes(projects: List[ProjectBody]):
+    """
+    Update indexes for the given projects, uploading a list of projects to update indexes for.
+    """
     # Upload data to database
     try:
         # The 'projects' argument is now directly the list of ProjectBody model objects.
@@ -196,8 +266,11 @@ async def update_indexes(projects: List[ProjectBody]):
 
 
 # Get method from signature
-@app.get("/method-from-signature")
+@app.get("/method-from-signature", tags=["Method Retrieval"])
 def method_from_signature(signature: str, file_name: str):
+    """
+        Get method from signature
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.row_factory = sqlite3.Row
@@ -233,9 +306,11 @@ def method_from_signature(signature: str, file_name: str):
         else:
             raise HTTPException(status_code=404, detail="Method not found")
 
-@app.get("/method/{method_id}")
+@app.get("/method/{method_id}", tags=["Method Retrieval"])
 def get_method(method_id: int):
-    print("Getting method with id:", method_id)
+    """
+        Get method from id
+    """
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.row_factory = sqlite3.Row
@@ -265,8 +340,11 @@ def get_method(method_id: int):
 #                 callees+=(get_method_from_signature(callee["signature"],entry["document_path"],data)+"\n")
 #     return callees
 
-@app.get("/used-methods/{method_id}")
+@app.get("/used-methods/{method_id}", tags=["Used Methods"])
 def used_methods(method_id: int):
+    """
+        Get methods used by the method with given id
+    """
     print("Getting used methods for method_id:", method_id)
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -296,8 +374,11 @@ def used_methods(method_id: int):
         used_methods = [dict(row) for row in rows]
         return {"used_methods": used_methods}
 
-@app.get("/related-methods/{method_id}")
+@app.get("/related-methods/{method_id}", tags=["Related Methods"])
 def related_methods(method_id: int):
+    """
+        Get methods related to the method with given id
+    """
     print("Getting related methods for method_id:", method_id)
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -329,29 +410,3 @@ def related_methods(method_id: int):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-
-# Old query
-            # query = '''
-            #     SELECT
-            #         prj.id as project_id, prj.name as project_name,
-            #         doc.id as document_id, doc.path as document_path,
-            #         class.id as class_id, class.name as class_name,
-            #         method.id as method_id, method.name as method_name,
-            #         method.signature as method_signature, method.body as method_body,
-            #         JSON_GROUP_ARRAY(
-            #             DISTINCT JSON_OBJECT('id', callee_method.id, 'signature', callee_method.signature)
-            #         ) FILTER (WHERE callee_method.id IS NOT NULL) as callees,
-            #         JSON_GROUP_ARRAY(
-            #             DISTINCT JSON_OBJECT('id', caller_method.id, 'signature', caller_method.signature)
-            #         ) FILTER (WHERE caller_method.id IS NOT NULL) as callers
-            #     FROM methods as method
-            #         INNER JOIN classes as class ON method.class_id = class.id
-            #         INNER JOIN documents as doc ON class.document_id = doc.id
-            #         INNER JOIN projects as prj ON doc.project_id = prj.id
-            #         LEFT JOIN method_calls as callee_join ON method.id = callee_join.caller_id
-            #         LEFT JOIN methods as callee_method ON callee_join.callee_id = callee_method.id
-            #         LEFT JOIN method_calls as caller_join ON method.id = caller_join.callee_id
-            #         LEFT JOIN methods as caller_method ON caller_join.caller_id = caller_method.id
-            #         GROUP BY method.id
-            # '''
-            # cursor.execute(query)
