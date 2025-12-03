@@ -1,5 +1,6 @@
 import type { AxiosResponse } from 'axios'
 import type { Buffer } from 'node:buffer'
+import type { ChildProcess } from 'node:child_process'
 import type Stream from 'node:stream'
 import { exec, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
@@ -12,6 +13,8 @@ let gimOutputChannel: vscode.OutputChannel
 
 const DOTNET_PATH = '/usr/local/share/dotnet/dotnet'
 
+let childProcesses: ChildProcess[] = []
+
 export function activate(context: vscode.ExtensionContext) {
   // Initial update indexes on activation
   gimOutputChannel = vscode.window.createOutputChannel('GIM')
@@ -19,6 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
   gimOutputChannel.appendLine('Starting AI Server...')
   gimOutputChannel.show(true)
   const extensionPath = context.extensionPath
+
   exec('uv sync')
 
   setupAiServer(extensionPath)
@@ -175,6 +179,15 @@ function analyzeFile() {
 }
 
 export function deactivate() {
+  for (const child of childProcesses) {
+    try {
+      child.kill('SIGTERM')
+    }
+    catch (e) {
+      console.error('Failed to kill process', e)
+    }
+  }
+  childProcesses = []
 }
 
 async function updateIndexes() {
@@ -223,6 +236,8 @@ function setupAiServer(extensionPath: string) {
     cwd: `${extensionPath}/ai-server`,
   })
 
+  childProcesses.push(ai)
+
   ai.stdout.on('data', (data) => {
     gimOutputChannel.append(data.toString())
   })
@@ -245,6 +260,8 @@ function setupSqliteServer(extensionPath: string) {
   const sqliteServer = spawn('uv', ['run', 'main.py'], {
     cwd: `${extensionPath}/sqlite-server`,
   })
+
+  childProcesses.push(sqliteServer)
 
   sqliteServer.stdout.on('data', (data) => {
     gimOutputChannel.append(data.toString())
@@ -282,6 +299,7 @@ function setupRoslyn(extensionPath: string) {
   const roslyn = spawn(DOTNET_PATH, ['run', 'server'], {
     cwd: `${extensionPath}/roslyn-analyzer/Analyzer`,
   })
+  childProcesses.push(roslyn)
 
   roslyn.on('spawn', () => {
     setTimeout(() => {
