@@ -27,8 +27,10 @@ async def docstring(body: ReqBody):
         sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
         return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
     except Exception as e:
-        raise HTTPException(detail=e, status_code=500) from e
-    
+        raise HTTPException(
+            detail="somehting went wrong, do better", status_code=500
+        ) from e
+
 @app.post("/explain")
 async def explain(body: ReqBody):
     '''Explain the code in the given signature in the given file'''
@@ -43,7 +45,9 @@ async def explain(body: ReqBody):
         sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
         return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
     except Exception as e:
-        raise HTTPException(detail=e, status_code=500) from e
+        raise HTTPException(
+            detail="somehting went wrong, do better", status_code=500
+        ) from e
 @app.post("/related-code")
 async def related_code(body: ReqBody):
     if not body.signature:
@@ -57,8 +61,8 @@ async def related_code(body: ReqBody):
         sys_prompt, user_prompt = get_related_code_prompts(method, used_methods)
         return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
     except Exception as e:
-        raise HTTPException(detail=e, status_code=500) from e
-    
+        raise HTTPException(detail="somehting went wrong, do better", status_code=500) from e
+
 def get_methods_for_related_code(signature, file_name):
     method, id = get_method_from_signature(signature, file_name)
     related_methods = get_related_methods(id)
