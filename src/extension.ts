@@ -6,7 +6,7 @@ import { exec, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { env } from 'node:process'
-import axios from 'axios'
+import axios, { request } from 'axios'
 import * as vscode from 'vscode'
 
 let gimOutputChannel: vscode.OutputChannel
@@ -14,6 +14,8 @@ let gimOutputChannel: vscode.OutputChannel
 const DOTNET_PATH = '/usr/local/share/dotnet/dotnet'
 
 let childProcesses: ChildProcess[] = []
+
+const model = 'qwen2.5-coder:3b'
 
 export function activate(context: vscode.ExtensionContext) {
   // Initial update indexes on activation
@@ -62,6 +64,40 @@ export function activate(context: vscode.ExtensionContext) {
   )
 }
 
+interface MethodResult {
+  symbol: vscode.DocumentSymbol
+  signature: string
+}
+
+function getSelectedMethods(params: {
+  symbols: vscode.DocumentSymbol[]
+  selection: vscode.Range
+  document: vscode.TextDocument
+}): MethodResult[] {
+  const { symbols, selection, document } = params
+  const selectedMethods: MethodResult[] = []
+
+  for (const symbol of symbols) {
+    const overlaps = selection.intersection(symbol.range)
+
+    if (overlaps) {
+      if (symbol.kind === vscode.SymbolKind.Method) {
+        const signature = document.getText(symbol.range)
+        selectedMethods.push({
+          symbol,
+          signature: signature.trim(),
+        })
+      }
+
+      if (symbol.children.length > 0) {
+        const childMethods = getSelectedMethods({ symbols: symbol.children, selection, document })
+        selectedMethods.push(...childMethods)
+      }
+    }
+  }
+  return selectedMethods
+}
+
 async function docstringFromSelection() {
   const editor = vscode.window.activeTextEditor
   if (!editor) {
@@ -69,16 +105,41 @@ async function docstringFromSelection() {
     return
   }
 
-  // Example data to send to your backend
+  const document = editor.document
+  let signature = ''
+
+  const selection = editor.selection
+
+  if (selection.isEmpty) {
+    vscode.window.showErrorMessage('GIM: Nothing is selected')
+    return
+  }
+
+  const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+    'vscode.executeDocumentSymbolProvider',
+    document.uri,
+  )
+
+  if (!symbols) {
+    vscode.window.showErrorMessage('GIM: Nothing here')
+    return
+  }
+
+  const methods = getSelectedMethods({ symbols, selection, document })
+
+  signature = methods[0].signature
+
   const requestBody: {
     file_name: string
     signature: string
     model_name: string
   } = {
     file_name: editor.document.fileName,
-    signature: '',
-    model_name: '',
+    signature,
+    model_name: model,
   }
+
+  gimOutputChannel.appendLine(JSON.stringify(requestBody))
 
   try {
     const response: AxiosResponse<Stream> = await axios.post(
@@ -86,7 +147,6 @@ async function docstringFromSelection() {
       requestBody,
       {
         responseType: 'stream',
-        // Add a timeout for the initial connection
         timeout: 10000,
       },
     )
@@ -170,11 +230,10 @@ function explainFromSelection() {
 
 function analyzeFile() {
   const editor = vscode.window.activeTextEditor
-  if (editor) {
+  if (!editor) {
     vscode.window.showInformationMessage(`GIM: Current file is !${editor.document}`)
     return
   }
-
   vscode.window.showErrorMessage('GIM: No file open')
 }
 
@@ -216,8 +275,8 @@ async function updateIndexes() {
     console.log('GIM: Indexes updated successfully', response.data)
     vscode.window.showInformationMessage('GIM: Indexes updated successfully')
   }).catch((error) => {
-    console.error('GIM: Error updating indexes', error)
-    vscode.window.showErrorMessage(`GIM: Error updating indexes: ${error.message}`)
+    gimOutputChannel.appendLine('[ERROR] Error updating indexes', error)
+    vscode.window.showErrorMessage(`[ERROR] Error updating indexes: ${error.message}`)
   })
 }
 
@@ -296,8 +355,8 @@ function setupRoslyn(extensionPath: string) {
 
   env.DOTNET_ROOT = '/usr/local/share/dotnet/'
   env.PATH = `${env.PATH}:/usr/local/share/dotnet/`
-  const roslyn = spawn(DOTNET_PATH, ['run', 'server'], {
-    cwd: `${extensionPath}/roslyn-analyzer/Analyzer`,
+  const roslyn = spawn('dotnet', ['run', 'server'], {
+    cwd: `${extensionPath}/roslyn-analyzer`,
   })
   childProcesses.push(roslyn)
 

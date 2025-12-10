@@ -13,9 +13,7 @@ if (!MSBuildLocator.IsRegistered)
 
 if (args.Length > 0 && args[0].ToLower() == "server")
 {
-    // The code will now act as a simple HTTP server on port 8080
     var listener = new HttpListener();
-    listener.Prefixes.Add("http://127.0.0.1:8080/");
     listener.Start();
     Console.WriteLine("Listening for requests on http://127.0.0.1:8080/...");
 
@@ -82,7 +80,6 @@ static async Task ProcessRequestAsync(HttpListenerContext context)
 {
     var response = context.Response;
     response.ContentType = "application/json";
-
     try
     {
         if (context.Request.HttpMethod == "POST" && context.Request.Url!.AbsolutePath == "/update-codebase-indexes")
@@ -175,6 +172,7 @@ static async Task ProcessRequestAsync(HttpListenerContext context)
         var errorBuffer = Encoding.UTF8.GetBytes(errorJson);
         response.ContentLength64 = errorBuffer.Length;
         await response.OutputStream.WriteAsync(errorBuffer, 0, errorBuffer.Length);
+        Console.WriteLine(ex);
     }
     finally
     {
@@ -216,7 +214,12 @@ static async Task<List<object>> RunAnalysisAsync(string targetPath)
                 Project = project.Name,
                 Document = doc.FilePath,
                 Classes = walker.Classes,
-                Methods = walker.Methods.Select(m => new { Signature = m.signature, Body = m.body }),
+                Methods = walker.Methods.Select(m => new { 
+                    Signature = m.signature, 
+                    Body = m.body,
+                    StartLine = m.startLine,
+                    EndLine = m.endLine
+                }),
                 Calls = walker.Calls.Select(c => new { Caller = c.caller, Callee = c.callee })
             });
         }
@@ -247,7 +250,7 @@ class ApiWalker : CSharpSyntaxWalker
     private readonly SemanticModel _model;
 
     public List<string> Classes { get; } = new();
-    public List<(string signature, string body)> Methods { get; } = new();
+    public List<(string signature, string body, int startLine, int endLine)> Methods { get; } = new();
     public List<(string caller, string callee)> Calls { get; } = new();
 
     private string? _currentMethod;
@@ -288,9 +291,11 @@ class ApiWalker : CSharpSyntaxWalker
                 body = node.Body.NormalizeWhitespace().ToFullString();
             else if (node.ExpressionBody != null)
                 body = node.ExpressionBody.NormalizeWhitespace().ToFullString();
-
+            
+            var startLine = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
+            var endLine = node.GetLocation().GetLineSpan().EndLinePosition.Line + 1;
             body = body.Replace("\r\n", "\n");
-            Methods.Add((_currentMethod, body));
+            Methods.Add((_currentMethod, body, startLine, endLine));
         }
 
         base.VisitMethodDeclaration(node);
