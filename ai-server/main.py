@@ -70,8 +70,7 @@ def get_methods_for_related_code(signature, file_name):
     return method, used_methods
 
 def get_methods_for_prompts(signature, file_name):
-    data = get_method_from_signature(signature, file_name)
-    print("DATA:", data)
+    method, method_id = get_method_from_signature(signature, file_name)
     used_methods = get_used_methods(method_id)
     return method, used_methods
 
