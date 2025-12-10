@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
@@ -16,6 +16,13 @@ class ReqBody(BaseModel):
 @app.post("/docstring")
 async def docstring(body: ReqBody):
     '''Generate docstring for given method in the given file'''
+    if not body.signature:
+        raise HTTPException(detail="Missing signature in body", status_code=400)
+    if not body.file_name:
+        raise HTTPException(detail="Missing file name in body", status_code=400)
+    if not body.model_name:
+        raise HTTPException(detail="Missing model name in body", status_code=400)
+    
     method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
     sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
@@ -23,12 +30,26 @@ async def docstring(body: ReqBody):
 @app.post("/explain")
 async def explain(body: ReqBody):
     '''Explain the code in the given signature in the given file'''
+    if not body.signature:
+        raise HTTPException(detail="Missing signature in body", status_code=400)
+    if not body.file_name:
+        raise HTTPException(detail="Missing file name in body", status_code=400)
+    if not body.model_name:
+        raise HTTPException(detail="Missing model name in body", status_code=400)
+    
     method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
     sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
     return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
 
 @app.post("/related-code")
 async def related_code(body: ReqBody):
+    if not body.signature:
+        raise HTTPException(detail="Missing signature in body", status_code=400)
+    if not body.file_name:
+        raise HTTPException(detail="Missing file name in body", status_code=400)
+    if not body.model_name:
+        raise HTTPException(detail="Missing model name in body", status_code=400)
+    
     method, used_methods = get_methods_for_related_code(body.signature, body.file_name)
     sys_prompt, user_prompt = get_related_code_prompts(method, used_methods)
     print(sys_prompt)
@@ -49,7 +70,8 @@ def get_methods_for_related_code(signature, file_name):
     return method, used_methods
 
 def get_methods_for_prompts(signature, file_name):
-    method, method_id = get_method_from_signature(signature, file_name)
+    data = get_method_from_signature(signature, file_name)
+    print("DATA:", data)
     used_methods = get_used_methods(method_id)
     return method, used_methods
 
