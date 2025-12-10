@@ -14,6 +14,75 @@ let gimOutputChannel: vscode.OutputChannel
 const DOTNET_PATH = '/usr/local/share/dotnet/dotnet'
 
 let childProcesses: ChildProcess[] = []
+const modelName = 'gemma:7b'
+class GimCodeActionProvider implements vscode.CodeActionProvider {
+  provideCodeActions(
+    document: vscode.TextDocument,
+    range: vscode.Range | vscode.Selection,
+  ): vscode.ProviderResult<(vscode.Command | vscode.CodeAction)[]> {
+    const docstringAction = new vscode.CodeAction('GIM: Generate Docstring', vscode.CodeActionKind.RefactorRewrite)
+    docstringAction.command = {
+      command: 'gim.selection.docstring',
+      title: 'GIM: Generate Docstring',
+      tooltip: 'Generates a C# XML docstring for the selected code.',
+      // Pass the selection as an argument to the command
+      arguments: [range],
+    }
+
+    const analyzeAction = new vscode.CodeAction('GIM: Analyze Code', vscode.CodeActionKind.RefactorRewrite)
+    analyzeAction.command = {
+      command: 'gim.selection.analyze',
+      title: 'GIM: Analyze Code',
+      tooltip: 'Analyzes the selected code for potential issues.',
+      // Pass the selection as an argument to the command
+      arguments: [range],
+    }
+
+    const explainAction = new vscode.CodeAction('GIM: Explain Code', vscode.CodeActionKind.RefactorRewrite)
+    explainAction.command = {
+      command: 'gim.selection.explain',
+      title: 'GIM: Explain Code',
+      tooltip: 'Explains the selected code.',
+      // Pass the selection as an argument to the command
+      arguments: [range],
+    }
+
+    // Only show selection-based actions if there is a selection
+    if (range.isEmpty) {
+      console.log('CODE_ACTION: No selection, providing file-level actions')
+      return [docstringAction, analyzeAction, explainAction]
+    }
+
+    const docstringSelectedAction = new vscode.CodeAction('GIM: Generate Docstring', vscode.CodeActionKind.RefactorRewrite)
+    docstringSelectedAction.command = {
+      command: 'gim.selection.docstring',
+      title: 'GIM: Generate Docstring',
+      tooltip: 'Generates a C# XML docstring for the selected code.',
+      // Pass the selection as an argument to the command
+      arguments: [range],
+    }
+
+    const analyzeSelectedAction = new vscode.CodeAction('GIM: Analyze Selection', vscode.CodeActionKind.Refactor)
+    analyzeSelectedAction.command = {
+      command: 'gim.selection.analyze',
+      title: 'GIM: Analyze Selection',
+      tooltip: 'Analyzes the selected code for potential issues.',
+      arguments: [range],
+
+    }
+
+    const explainSelectedAction = new vscode.CodeAction('GIM: Explain Selection', vscode.CodeActionKind.Refactor)
+    explainSelectedAction.command = {
+      command: 'gim.selection.explain',
+      title: 'GIM: Explain Selection',
+      tooltip: 'Explains the selected code.',
+      arguments: [range],
+
+    }
+
+    return [docstringSelectedAction, analyzeSelectedAction, explainSelectedAction]
+  }
+}
 
 export function activate(context: vscode.ExtensionContext) {
   // Initial update indexes on activation
@@ -60,9 +129,17 @@ export function activate(context: vscode.ExtensionContext) {
       explainFromSelection,
     ),
   )
+
+  // Register our custom Code Action provider for C# files.
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      { scheme: 'file', language: 'csharp', pattern: '**/*.{cs,csx}' },
+      new GimCodeActionProvider(),
+    ),
+  )
 }
 
-async function docstringFromSelection() {
+async function docstringFromSelection(range?: vscode.Range) {
   const editor = vscode.window.activeTextEditor
   if (!editor) {
     vscode.window.showInformationMessage('No active editor found.')
@@ -70,14 +147,21 @@ async function docstringFromSelection() {
   }
 
   // Example data to send to your backend
+  const selection = range || editor.selection
+  if (selection.isEmpty) {
+    vscode.window.showInformationMessage('Please select a method or property to generate a docstring for.')
+    return
+  }
+  const selectedText = editor.document.getText(selection)
+
   const requestBody: {
     file_name: string
-    signature: string
     model_name: string
+    signature: string
   } = {
     file_name: editor.document.fileName,
-    signature: '',
-    model_name: '',
+    model_name: modelName,
+    signature: selectedText,
   }
 
   try {
