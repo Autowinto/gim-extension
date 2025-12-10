@@ -17,14 +17,14 @@ async def get_chat_stream(model: str, sys_prompt:str, user_prompt:str):
     return stream
 
 async def generate_response(model: str, sys_prompt: str, user_prompt: str) -> AsyncGenerator[str, None]:
-    data = ""
     stream = await get_chat_stream(model, sys_prompt, user_prompt)
+    data = ""
     async for chunk in stream:
         content = chunk.get('message', {}).get('content')
         if content:
             data+=content
             yield f"data: {json.dumps({'token': content})}\n\n"
-    
+    print(data)
 def get_used_methods(method_id):
     data = requests.get(f"{API_BASE}used-methods/{method_id}")
     return data.json().values()
@@ -35,6 +35,14 @@ def get_method_from_signature(signature:str, file_name:str) ->tuple[str, int]:
         "file_name":file_name
     })
     return data.json().values() #method, id
+
+
+def get_related_methods(method_id: str) -> tuple[str, int]:
+    data = requests.get(
+        API_BASE + f"related-methods/{method_id}",
+    )
+    return data.json()
+
 
 def json_method_to_string(header, body):
     return header+body

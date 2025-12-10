@@ -18,8 +18,21 @@ You are successful by only outputting the documentation for the first given meth
 '''
     return sys_prompt, user_prompt
 
-def get_related_code_prompts():
-    return"",""
+def get_related_code_prompts(method, related_methods):
+    sys_prompt = f'''You are a C# code expert, and your job is to analyze a legacy C# method, and in which situations it is used. You will be provided with usages of the following method:
+    
+    {method}
+    
+    In your response you must explain the use of this method in each of the given code snippets, that are separated by "-". Your response must be plain text readable.
+    {"-"*50}
+    
+'''
+    user_prompt = ''''''
+    for rm in related_methods:
+        user_prompt+= f"Used in the file {rm["path"]}\n"
+        user_prompt+= rm["method"]+"\n"
+        user_prompt+= f"{"-"*50}\n"
+    return sys_prompt, user_prompt
 
 def get_explain_code_prompts(method:str, used_methods: str):
     '''Input the method, its signature, and its body, formatted to look like they would in code.
