@@ -22,11 +22,13 @@ async def docstring(body: ReqBody):
         raise HTTPException(detail="Missing file name in body", status_code=400)
     if not body.model_name:
         raise HTTPException(detail="Missing model name in body", status_code=400)
+    try:
+        method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
+        sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
+        return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(detail=e, status_code=500) from e
     
-    method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
-    sys_prompt, user_prompt = get_docstring_prompts(method, used_methods)
-    return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
-
 @app.post("/explain")
 async def explain(body: ReqBody):
     '''Explain the code in the given signature in the given file'''
@@ -36,11 +38,12 @@ async def explain(body: ReqBody):
         raise HTTPException(detail="Missing file name in body", status_code=400)
     if not body.model_name:
         raise HTTPException(detail="Missing model name in body", status_code=400)
-    
-    method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
-    sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
-    return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
-
+    try:
+        method, used_methods = get_methods_for_prompts(body.signature, body.file_name)
+        sys_prompt, user_prompt = get_explain_code_prompts(method, used_methods)
+        return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(detail=e, status_code=500) from e
 @app.post("/related-code")
 async def related_code(body: ReqBody):
     if not body.signature:
@@ -49,13 +52,13 @@ async def related_code(body: ReqBody):
         raise HTTPException(detail="Missing file name in body", status_code=400)
     if not body.model_name:
         raise HTTPException(detail="Missing model name in body", status_code=400)
+    try:
+        method, used_methods = get_methods_for_related_code(body.signature, body.file_name)
+        sys_prompt, user_prompt = get_related_code_prompts(method, used_methods)
+        return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
+    except Exception as e:
+        raise HTTPException(detail=e, status_code=500) from e
     
-    method, used_methods = get_methods_for_related_code(body.signature, body.file_name)
-    sys_prompt, user_prompt = get_related_code_prompts(method, used_methods)
-    print(sys_prompt)
-    print(user_prompt)
-    return StreamingResponse(generate_response(body.model_name, sys_prompt, user_prompt), media_type="text/event-stream")
-
 def get_methods_for_related_code(signature, file_name):
     method, id = get_method_from_signature(signature, file_name)
     related_methods = get_related_methods(id)
