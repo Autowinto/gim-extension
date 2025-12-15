@@ -1,0 +1,166 @@
+{
+  "data": [
+    {
+      "project_id": 1,
+      "project_name": "DemoLib",
+      "document_id": 1,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoLib/Class1.cs",
+      "class_id": 1,
+      "class_name": "DemoLib.Calculator",
+      "method_id": 1,
+      "method_name": "Add(int, int)",
+      "method_signature": "DemoLib.Calculator.Add(int, int)",
+      "method_body": "=> a + b",
+      "callees": [],
+      "callers": [
+        {
+          "id": 4,
+          "signature": "DemoLib.Calculator.Divide(int, int)"
+        },
+        {
+          "id": 7,
+          "signature": "Program.Main()"
+        }
+      ]
+    },
+    {
+      "project_id": 1,
+      "project_name": "DemoLib",
+      "document_id": 1,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoLib/Class1.cs",
+      "class_id": 1,
+      "class_name": "DemoLib.Calculator",
+      "method_id": 2,
+      "method_name": "Subtract(int, int)",
+      "method_signature": "DemoLib.Calculator.Subtract(int, int)",
+      "method_body": "=> a - b",
+      "callees": [],
+      "callers": [
+        {
+          "id": 7,
+          "signature": "Program.Main()"
+        }
+      ]
+    },
+    {
+      "project_id": 1,
+      "project_name": "DemoLib",
+      "document_id": 1,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoLib/Class1.cs",
+      "class_id": 1,
+      "class_name": "DemoLib.Calculator",
+      "method_id": 3,
+      "method_name": "Multiply(int, int)",
+      "method_signature": "DemoLib.Calculator.Multiply(int, int)",
+      "method_body": "=> a * b",
+      "callees": [],
+      "callers": [
+        {
+          "id": 7,
+          "signature": "Program.Main()"
+        }
+      ]
+    },
+    {
+      "project_id": 1,
+      "project_name": "DemoLib",
+      "document_id": 1,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoLib/Class1.cs",
+      "class_id": 1,
+      "class_name": "DemoLib.Calculator",
+      "method_id": 4,
+      "method_name": "Divide(int, int)",
+      "method_signature": "DemoLib.Calculator.Divide(int, int)",
+      "method_body": "{\n    if (b == 0)\n        throw new DivideByZeroException();\n    int x = Add(1, 1);\n    return (double)a / b;\n}",
+      "callees": [
+        {
+          "id": 1,
+          "signature": "DemoLib.Calculator.Add(int, int)"
+        }
+      ],
+      "callers": [
+        {
+          "id": 7,
+          "signature": "Program.Main()"
+        }
+      ]
+    },
+    {
+      "project_id": 1,
+      "project_name": "DemoLib",
+      "document_id": 1,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoLib/Class1.cs",
+      "class_id": 2,
+      "class_name": "DemoLib.MathUtils",
+      "method_id": 5,
+      "method_name": "Square(int)",
+      "method_signature": "DemoLib.MathUtils.Square(int)",
+      "method_body": "=> x * x",
+      "callees": [],
+      "callers": [
+        {
+          "id": 7,
+          "signature": "Program.Main()"
+        }
+      ]
+    },
+    {
+      "project_id": 1,
+      "project_name": "DemoLib",
+      "document_id": 1,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoLib/Class1.cs",
+      "class_id": 2,
+      "class_name": "DemoLib.MathUtils",
+      "method_id": 6,
+      "method_name": "Sum(params int[])",
+      "method_signature": "DemoLib.MathUtils.Sum(params int[])",
+      "method_body": "{\n    int total = 0;\n    foreach (var n in numbers)\n        total += n;\n    return total;\n}",
+      "callees": [],
+      "callers": [
+        {
+          "id": 7,
+          "signature": "Program.Main()"
+        }
+      ]
+    },
+    {
+      "project_id": 2,
+      "project_name": "DemoApp",
+      "document_id": 2,
+      "document_path": "/Users/sandbye/Documents/GitHub/gim-extension/demo-sln/DemoApp/Program.cs",
+      "class_id": 3,
+      "class_name": "Program",
+      "method_id": 7,
+      "method_name": "Main()",
+      "method_signature": "Program.Main()",
+      "method_body": "{\n    var calc = new Calculator();\n    int a = 10, b = 5;\n    Console.WriteLine($\"Add: {calc.Add(a, b)}\");\n    Console.WriteLine($\"Subtract: {calc.Subtract(a, b)}\");\n    Console.WriteLine($\"Multiply: {calc.Multiply(a, b)}\");\n    Console.WriteLine($\"Divide: {calc.Divide(a, b)}\");\n    Console.WriteLine($\"Square: {MathUtils.Square(a)}\");\n    Console.WriteLine($\"Sum: {MathUtils.Sum(1, 2, 3, 4, 5)}\");\n}",
+      "callees": [
+        {
+          "id": 1,
+          "signature": "DemoLib.Calculator.Add(int, int)"
+        },
+        {
+          "id": 2,
+          "signature": "DemoLib.Calculator.Subtract(int, int)"
+        },
+        {
+          "id": 3,
+          "signature": "DemoLib.Calculator.Multiply(int, int)"
+        },
+        {
+          "id": 4,
+          "signature": "DemoLib.Calculator.Divide(int, int)"
+        },
+        {
+          "id": 5,
+          "signature": "DemoLib.MathUtils.Square(int)"
+        },
+        {
+          "id": 6,
+          "signature": "DemoLib.MathUtils.Sum(params int[])"
+        }
+      ],
+      "callers": []
+    }
+  ]
+}

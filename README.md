@@ -62,6 +62,9 @@ Get this:
 
 ---
 
+## Dependencies
+- UV
+
 ## 📦 Installation
 
 1. Download the latest `.exe` from [Releases](https://github.com/your-org/gim/releases)
