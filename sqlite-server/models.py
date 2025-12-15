@@ -1,14 +1,18 @@
-
 from pydantic import BaseModel
 from typing import List
+
 
 class MethodsBody(BaseModel):
     Signature: str
     Body: str
+    StartLine: int
+    EndLine: int
+
 
 class CallsBody(BaseModel):
     Caller: str
     Callee: str
+
 
 class ProjectBody(BaseModel):
     Project: str
@@ -17,9 +21,11 @@ class ProjectBody(BaseModel):
     Methods: List[MethodsBody] = []
     Calls: List[CallsBody] = []
 
+
 class CallsResponseBody(BaseModel):
-    id: int # Method id 
+    id: int  # Method id
     signature: str
+
 
 class FetchAllResponse(BaseModel):
     project_id: int
@@ -31,35 +37,45 @@ class FetchAllResponse(BaseModel):
     method_id: int
     method_name: str
     method_signature: str
+    method_start_line: int
+    method_end_line: int
     method_body: str
-    callees: List[CallsResponseBody] = [] # Methods that this method calls
-    callers: List[CallsResponseBody] = [] # Methods that call this method
+    callees: List[CallsResponseBody] = []  # Methods that this method calls
+    callers: List[CallsResponseBody] = []  # Methods that call this method
+
 
 class ProjectsResponse(BaseModel):
     id: int
     name: str
+
 
 class DocumentsResponse(BaseModel):
     id: int
     project_id: int
     path: str
 
+
 class ClassesResponse(BaseModel):
     id: int
     document_id: int
     name: str
+
 
 class MethodsResponse(BaseModel):
     id: int
     class_id: int
     name: str
     signature: str
+    start_line: int
+    end_line: int
     body: str
+
 
 class MethodCallsResponse(BaseModel):
     id: int
     caller_id: int
     callee_id: int
+
 
 class UpdateIndexesResponse(BaseModel):
     id: int

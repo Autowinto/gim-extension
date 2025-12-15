@@ -1,6 +1,8 @@
 from models import ProjectBody
+
+
 # Helper class to process the update of a single project at a time
-class UpdateIndexes: 
+class UpdateIndexes:
     def __init__(self, body: ProjectBody, conn=None):
         self.body = body
         self.conn = conn
@@ -24,16 +26,14 @@ class UpdateIndexes:
         self.insert_methods(cursor, self.methods, class_id_map, self.projectName)
         self.insert_method_calls(cursor, self.calls, class_id_map)
         return self.commit(cursor)
-    
+
     def insert_project(self, cursor, projectName):
         cursor.execute("SELECT id FROM projects WHERE name = ?", (projectName,))
         existing_project = cursor.fetchone()
         if existing_project:
             project_id = existing_project[0]
         else:
-            cursor.execute(
-                "INSERT INTO projects (name) VALUES (?)", (projectName,)
-            )
+            cursor.execute("INSERT INTO projects (name) VALUES (?)", (projectName,))
             project_id = cursor.lastrowid
         return project_id
 
@@ -49,7 +49,7 @@ class UpdateIndexes:
             )
             document_id = cursor.lastrowid
         return document_id
-    
+
     def insert_classes(self, cursor, document_id, classes):
         class_id_map = {}
         for cls in classes:
@@ -65,16 +65,23 @@ class UpdateIndexes:
                 class_id = cursor.lastrowid
             class_id_map[cls] = class_id
         return class_id_map
-    
+
     def insert_methods(self, cursor, methods, class_id_map, projectName):
         for method in methods:
-            cursor.execute("SELECT id FROM methods WHERE signature = ?", (method.Signature,))
+            cursor.execute(
+                "SELECT id FROM methods WHERE signature = ?", (method.Signature,)
+            )
             existing_method = cursor.fetchone()
             method_id = None
             body = method.Body
+            start_line = method.StartLine
+            end_line = method.EndLine
             if existing_method:
                 method_id = existing_method[0]
-                cursor.execute("UPDATE methods SET body = ? WHERE id = ?", (body, method_id))
+                cursor.execute(
+                    "UPDATE methods SET body = ?, start_line = ?, end_line = ? WHERE id = ?",
+                    (body, start_line, end_line, method_id),
+                )
             else:
                 signature = method.Signature
                 class_name = ".".join(signature.split(".")[:-1]).split(" ")[-1]
@@ -83,18 +90,17 @@ class UpdateIndexes:
                 if class_id is None:
                     # Fall back if no project prefix
                     class_id = class_id_map.get(class_name)
-                
+
                 if class_id:
                     cursor.execute(
-                        "INSERT INTO methods (class_id, name, signature, body) VALUES (?, ?, ?, ?)",
-                        (class_id, method_name, signature, body),
+                        "INSERT INTO methods (class_id, name, signature, start_line, end_line, body) VALUES (?, ?, ?, ?, ?, ?)",
+                        (class_id, method_name, signature, start_line, end_line, body),
                     )
-            
-                
+
     def insert_method_calls(self, cursor, method_calls, class_id_map):
         for call in method_calls:
             caller_signature = call.Caller
-            callee_prefixes = call.Callee.split(".");
+            callee_prefixes = call.Callee.split(".")
             # It is, <project-name or internal areas like "system">.<class-name>.<method-name>
             callee_proj_name = callee_prefixes[0]
             callee_class_name = callee_prefixes[1]
@@ -129,20 +135,22 @@ class UpdateIndexes:
             if caller_row and callee_row:
                 caller_id = caller_row[0]
                 callee_id = callee_row[0]
-                
+
                 cursor.execute(
                     "SELECT id FROM method_calls WHERE caller_id = ? AND callee_id = ?",
                     (caller_id, callee_id),
                 )
 
                 if not cursor.fetchone():
-                    print(f"Inserting method call from {caller_signature} to {call.Callee}")
+                    print(
+                        f"Inserting method call from {caller_signature} to {call.Callee}"
+                    )
                     cursor.execute(
                         "INSERT INTO method_calls (caller_id, callee_id) VALUES (?, ?)",
                         (caller_id, callee_id),
                     )
         return
-    
+
     def commit(self, cursor=None):
         try:
             if cursor:

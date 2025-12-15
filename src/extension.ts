@@ -145,6 +145,17 @@ interface MethodResult {
   signature: string
 }
 
+interface DbMethodResult {
+  method_id: number
+  method_name: string
+  method_signature: string
+  method_start_line: number
+  method_end_line: number
+  method_body: string
+  class_name: string
+  document_path: string
+}
+
 function getSelectedMethods(params: {
   symbols: vscode.DocumentSymbol[]
   selection: vscode.Range
@@ -174,6 +185,63 @@ function getSelectedMethods(params: {
   return selectedMethods
 }
 
+async function getSelectedMethodsFromDb(params: {
+  filePath: string
+  startLine: number
+  endLine: number
+}): Promise<DbMethodResult[]> {
+  const { filePath, startLine, endLine } = params
+
+  try {
+    const response = await axios.get<{ data: DbMethodResult[] }>(
+      'http://127.0.0.1:8000/fetch-all',
+    )
+
+    const allMethods = response.data.data
+    gimOutputChannel.appendLine(`[DEBUG] Total methods in database: ${allMethods.length}`)
+    gimOutputChannel.appendLine(`[DEBUG] Looking for methods in file: ${filePath}`)
+    gimOutputChannel.appendLine(`[DEBUG] Selection range: lines ${startLine}-${endLine}`)
+
+    const normalizePathForComparison = (p: string): string => p.replace(/\\/g, '/')
+
+    const normalizedFilePath = normalizePathForComparison(filePath)
+
+    const selectedMethods = allMethods.filter((method) => {
+      const normalizedDbPath = normalizePathForComparison(method.document_path)
+      const documentMatch = normalizedDbPath === normalizedFilePath
+        || normalizedDbPath.endsWith(normalizedFilePath.split('/').pop() || '')
+
+      const methodStart = method.method_start_line
+      const methodEnd = method.method_end_line
+      const overlaps = !(methodEnd < startLine || methodStart > endLine)
+
+      if (normalizePathForComparison(method.document_path).includes(normalizedFilePath.split('/').pop() || '')) {
+        gimOutputChannel.appendLine(
+          `[DEBUG] Found method in matching file: ${method.method_signature} (lines ${methodStart}-${methodEnd}, db_path: ${method.document_path})`,
+        )
+      }
+
+      return documentMatch && overlaps
+    })
+
+    gimOutputChannel.appendLine(`[DEBUG] Selected ${selectedMethods.length} methods matching selection range`)
+
+    const uniqueFiles = Array.from(new Set(allMethods.map(m => m.document_path)))
+    gimOutputChannel.appendLine(`[DEBUG] Files in database: ${uniqueFiles.slice(0, 10).join(', ')}${uniqueFiles.length > 10 ? '...' : ''}`)
+
+    return selectedMethods
+  }
+  catch (error) {
+    if (axios.isAxiosError(error)) {
+      gimOutputChannel.appendLine(`Error fetching methods from database: ${error.message}`)
+    }
+    else {
+      gimOutputChannel.appendLine(`Unexpected error fetching methods: ${String(error)}`)
+    }
+    return []
+  }
+}
+
 async function docstringFromSelection() {
   const editor = vscode.window.activeTextEditor
   if (!editor) {
@@ -182,7 +250,6 @@ async function docstringFromSelection() {
   }
 
   const document = editor.document
-  let signature = ''
 
   const selection = editor.selection
 
@@ -203,7 +270,35 @@ async function docstringFromSelection() {
 
   const methods = getSelectedMethods({ symbols, selection, document })
 
-  signature = methods[0].signature
+  // Also fetch methods from the database to get additional context
+  const dbMethods = await getSelectedMethodsFromDb({
+    filePath: editor.document.fileName,
+    startLine: selection.start.line,
+    endLine: selection.end.line,
+  })
+
+  gimOutputChannel.appendLine(`Found ${methods.length} methods from VSCode symbols`)
+  gimOutputChannel.appendLine(`Found ${dbMethods.length} methods from database`)
+
+  if (dbMethods.length > 0) {
+    gimOutputChannel.appendLine(`Selected methods from DB: ${dbMethods.map(m => m.method_signature).join(', ')}`)
+  }
+
+  let signature = ''
+  if (dbMethods.length > 0) {
+    signature = dbMethods[0].method_signature
+  }
+  else if (methods.length > 0) {
+    const fullText = methods[0].signature
+    const signatureLine = fullText.split('{')[0].trim()
+    signature = signatureLine
+  }
+
+  if (!signature) {
+    vscode.window.showErrorMessage('GIM: Could not determine method signature')
+    return
+  }
+
   const requestBody: {
     file_name: string
     model_name: string
@@ -242,43 +337,53 @@ async function docstringFromSelection() {
         try {
           // The data is a JSON string like {"token": "..."}∏
           // We need to parse it to get the actual content.
-          fullResponse += JSON.parse(data).token // Adjust based on actual data structure
+          if (data) {
+            fullResponse += JSON.parse(data).token // Adjust based on actual data structure
+          }
 
           progress.report({ message: 'Generating...' })
         }
         catch (e) {
-          console.error('Failed to parse SSE JSON data:', data, e)
+          gimOutputChannel.appendLine(`Failed to parse SSE JSON data: ${data}`)
+          gimOutputChannel.appendLine(`Parse error: ${String(e)}`)
         }
       }
       stream.on('data', onData)
 
       token.onCancellationRequested(() => {
-        // This will close the connection and stop the stream
         stream.off('data', onData)
-        console.log('User canceled the streaming operation.')
+        gimOutputChannel.appendLine('User canceled the streaming operation.')
       })
 
       return new Promise<void>((resolve, reject) => {
         stream.on('end', () => {
-          console.log('Stream ended.')
-          // Here you can insert the fullResponse into the editor
-          editor.edit((editBuilder) => {
-            // Format the complete response as a C# XML doc comment block.
-            const formattedDocstring = fullResponse
-              .split('\n')
-              .map(line => `// ${line}`)
-              .join('\n')
+          gimOutputChannel.appendLine('Stream ended.')
+          if (fullResponse.trim()) {
+            editor.edit((editBuilder) => {
+              const formattedDocstring = fullResponse
+                .split('\n')
+                .map(line => `// ${line}`)
+                .join('\n')
 
-            // Example: insert at current cursor position
-            editBuilder.insert(editor.selection.active, `${formattedDocstring}\n`)
-          })
+              editBuilder.insert(editor.selection.active, `${formattedDocstring}\n`)
+            })
+          }
+          else {
+            gimOutputChannel.appendLine('Warning: Stream ended but no response content received')
+          }
           resolve()
         })
 
         stream.on('error', (err) => {
-          console.error('Stream error:', err)
+          gimOutputChannel.appendLine(`Stream error: ${String(err)}`)
+          gimOutputChannel.appendLine(`Partial response collected: ${fullResponse.length} characters`)
           vscode.window.showErrorMessage('Error streaming response from AI server.')
           reject(err)
+        })
+
+        // Add a close handler in case the stream closes unexpectedly
+        stream.on('close', () => {
+          gimOutputChannel.appendLine('Stream closed')
         })
       })
     })
@@ -338,7 +443,6 @@ async function updateIndexes() {
 
   gimOutputChannel.appendLine('GIM: Updating indexes...')
   gimOutputChannel.appendLine(`GIM: Project path is ${projectPath}`)
-  // Find a file with .sln or .csproj
   const solutionFile = findSolutionFile(projectPath)
   gimOutputChannel.appendLine(`GIM: Solution file is ${solutionFile}`)
   console.log(`GIM: Project path is ${projectPath}, solution file is ${solutionFile}`)
@@ -416,18 +520,6 @@ function setupSqliteServer(extensionPath: string) {
 }
 
 function setupRoslyn(extensionPath: string) {
-  // exec(`${DOTNET_PATH} build`, { cwd: `${extensionPath}/roslyn-analyzer/Analyzer` }, (error, stdout, stderr) => {
-  //   if (error) {
-  //     gimOutputChannel.appendLine(`Error building Roslyn analyzer: ${error.message}`)
-  //     vscode.window.showErrorMessage(`Error building Roslyn analyzer: ${error.message}`)
-  //     return
-  //   }
-  //   if (stderr) {
-  //     gimOutputChannel.appendLine(`Roslyn build stderr: ${stderr}`)
-  //   }
-  //   gimOutputChannel.appendLine(`Roslyn build stdout: ${stdout}`)
-  // })
-
   env.DOTNET_ROOT = '/usr/local/share/dotnet/'
   env.PATH = `${env.PATH}:/usr/local/share/dotnet/`
   const roslyn = spawn('dotnet', ['run', 'server'], {

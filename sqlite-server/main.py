@@ -217,6 +217,8 @@ def fetch_all() -> dict[str, list[FetchAllResponse]]:
                     method.id.as_('method_id'),
                     method.name.as_('method_name'),
                     method.signature.as_('method_signature'),
+                    method.start_line.as_('method_start_line'),
+                    method.end_line.as_('method_end_line'),
                     method.body.as_('method_body'),
                     callees_clause,
                     callers_clause
