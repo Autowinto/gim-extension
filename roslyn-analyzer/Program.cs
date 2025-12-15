@@ -14,6 +14,7 @@ if (!MSBuildLocator.IsRegistered)
 if (args.Length > 0 && args[0].ToLower() == "server")
 {
     var listener = new HttpListener();
+    listener.Prefixes.Add("http://127.0.0.1:8080/");
     listener.Start();
     Console.WriteLine("Listening for requests on http://127.0.0.1:8080/...");
 
