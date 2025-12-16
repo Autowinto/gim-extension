@@ -34,6 +34,10 @@
       {
         "command": "gim.file.analyze",
         "title": "GIM: Analyze Current File"
+      },
+      {
+        "command": "gim.selectModel",
+        "title": "GIM: Select Model"
       }
     ]
   },

@@ -6,15 +6,15 @@ import { exec, spawn } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { env } from 'node:process'
-import axios, { request } from 'axios'
+import axios from 'axios'
 import * as vscode from 'vscode'
 
 let gimOutputChannel: vscode.OutputChannel
 
-const DOTNET_PATH = '/usr/local/share/dotnet/dotnet'
-
 let childProcesses: ChildProcess[] = []
-const modelName = 'gemma:7b'
+const availableModels = ['gemma:7b', 'gemma:13b', 'qwen2.5-coder:3b', 'qwen2.5-coder:7b', 'gpt-oss:latest']
+let currentModel = availableModels[0]
+
 class GimCodeActionProvider implements vscode.CodeActionProvider {
   provideCodeActions(
     document: vscode.TextDocument,
@@ -79,7 +79,48 @@ class GimCodeActionProvider implements vscode.CodeActionProvider {
   }
 }
 
-const model = 'gpt-oss:latest'
+interface PendingDocstring {
+  decorationType: vscode.TextEditorDecorationType
+  range: vscode.Range
+  editor: vscode.TextEditor
+}
+
+const pendingDocstrings = new Map<string, PendingDocstring>()
+
+class DocstringCodeLensProvider implements vscode.CodeLensProvider {
+  private _onDidChangeCodeLenses = new vscode.EventEmitter<void>()
+  readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event
+
+  refresh(): void {
+    this._onDidChangeCodeLenses.fire()
+  }
+
+  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+    const codeLenses: vscode.CodeLens[] = []
+
+    for (const [key, pending] of pendingDocstrings.entries()) {
+      if (pending.editor.document.uri.toString() === document.uri.toString()) {
+        const range = new vscode.Range(pending.range.start, pending.range.start)
+
+        const acceptLens = new vscode.CodeLens(range, {
+          title: '✓ Accept Docstring',
+          command: 'gim.acceptDocstring',
+          arguments: [key],
+        })
+
+        const discardLens = new vscode.CodeLens(range, {
+          title: '✗ Discard Docstring',
+          command: 'gim.discardDocstring',
+          arguments: [key],
+        })
+
+        codeLenses.push(acceptLens, discardLens)
+      }
+    }
+
+    return codeLenses
+  }
+}
 
 export function activate(context: vscode.ExtensionContext) {
   gimOutputChannel = vscode.window.createOutputChannel('GIM')
@@ -93,6 +134,66 @@ export function activate(context: vscode.ExtensionContext) {
   setupAiServer(extensionPath)
   setupSqliteServer(extensionPath)
   setupRoslyn(extensionPath)
+
+  const codeLensProvider = new DocstringCodeLensProvider()
+
+  context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider(
+      { scheme: 'file', language: 'csharp' },
+      codeLensProvider,
+    ),
+  )
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.acceptDocstring',
+      (key: string) => {
+        const pending = pendingDocstrings.get(key)
+        if (pending) {
+          pending.editor.setDecorations(pending.decorationType, [])
+          pendingDocstrings.delete(key)
+          codeLensProvider.refresh()
+          gimOutputChannel.appendLine(`Accepted docstring: ${key}`)
+        }
+      },
+    ),
+  )
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.selectModel',
+      async () => {
+        const selected = await vscode.window.showQuickPick(availableModels, {
+          placeHolder: `Current model: ${currentModel}`,
+          title: 'Select AI Model',
+        })
+
+        if (selected) {
+          currentModel = selected
+          vscode.window.showInformationMessage(`Model changed to: ${currentModel}`)
+          gimOutputChannel.appendLine(`[MODEL] Switched to ${currentModel}`)
+        }
+      },
+    ),
+  )
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'gim.discardDocstring',
+      async (key: string) => {
+        const pending = pendingDocstrings.get(key)
+        if (pending) {
+          await pending.editor.edit((editBuilder) => {
+            editBuilder.delete(pending.range)
+          })
+          pending.editor.setDecorations(pending.decorationType, [])
+          pendingDocstrings.delete(key)
+          codeLensProvider.refresh()
+          gimOutputChannel.appendLine(`Discarded docstring: ${key}`)
+        }
+      },
+    ),
+  )
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -292,7 +393,7 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
   const requestBody = {
     file_name: editor.document.fileName,
     signature: dbMethod.method_signature,
-    model_name: model,
+    model_name: currentModel,
   }
 
   gimOutputChannel.appendLine(`Requesting docstring for: ${JSON.stringify(requestBody)}`)
@@ -401,35 +502,25 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
               isWholeLine: true,
             })
 
-            const ranges: vscode.Range[] = []
-            for (let i = 0; i < docstringLines; i++) {
-              const lineNum = lineIndex + i
-              if (lineNum < updatedDocument.lineCount) {
-                ranges.push(updatedDocument.lineAt(lineNum).range)
-              }
-            }
-
-            editor.setDecorations(decorationType, ranges)
-
-            const userChoice = await vscode.window.showInformationMessage(
-              `Docstring for ${dbMethod.method_signature}`,
-              { modal: false },
-              'Accept',
-              'Discard',
+            const docstringRange = new vscode.Range(
+              new vscode.Position(lineIndex, 0),
+              new vscode.Position(lineIndex + docstringLines, 0),
             )
 
-            if (userChoice === 'Accept') {
-              gimOutputChannel.appendLine(`Accepted docstring for ${dbMethod.method_signature}`)
-              editor.setDecorations(decorationType, []) // Clear decoration
-            }
-            else if (userChoice === 'Discard') {
-              await editor.edit((editBuilder) => {
-                const startPos = new vscode.Position(lineIndex, 0)
-                const endPos = new vscode.Position(lineIndex + docstringLines, 0)
-                editBuilder.delete(new vscode.Range(startPos, endPos))
-              })
-              gimOutputChannel.appendLine(`Discarded docstring for ${dbMethod.method_signature}`)
-            }
+            editor.setDecorations(decorationType, [docstringRange])
+
+            // Store the pending docstring with a unique key
+            const key = `${dbMethod.method_signature}-${Date.now()}`
+            pendingDocstrings.set(key, {
+              decorationType,
+              range: docstringRange,
+              editor,
+            })
+
+            // Trigger CodeLens refresh to show Accept/Discard buttons
+            vscode.commands.executeCommand('vscode.executeCodeLensProvider', updatedDocument.uri)
+
+            gimOutputChannel.appendLine(`Docstring inserted with inline actions for ${dbMethod.method_signature}`)
           }
           else {
             gimOutputChannel.appendLine('Warning: Stream ended but no response content received')
@@ -513,7 +604,7 @@ async function generateAnalysisForMethod(editor: vscode.TextEditor, dbMethod: Db
   const requestBody = {
     file_name: editor.document.fileName,
     signature: dbMethod.method_signature,
-    model_name: model,
+    model_name: currentModel,
   }
 
   gimOutputChannel.appendLine(`Requesting analysis for: ${JSON.stringify(requestBody)}`)
@@ -563,90 +654,18 @@ async function generateAnalysisForMethod(editor: vscode.TextEditor, dbMethod: Db
           stream.off('data', onData)
 
           if (fullResponse.trim()) {
-            const document = editor.document
-
-            const lineIndex = dbMethod.method_start_line - 1
-            gimOutputChannel.appendLine(`[DEBUG] Database reported method starts at line ${dbMethod.method_start_line} (0-indexed: ${lineIndex})`)
-
-            if (lineIndex < 0 || lineIndex >= document.lineCount) {
-              gimOutputChannel.appendLine(`[ERROR] Line index ${lineIndex} is out of bounds (document has ${document.lineCount} lines)`)
-              vscode.window.showErrorMessage(`Could not insert analysis: line ${lineIndex} not found`)
-              resolve()
-              return
-            }
-
-            let methodSignatureLine = lineIndex
-            const methodLineContent = document.lineAt(lineIndex).text.trim()
-
-            if (!methodLineContent.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/)) {
-              gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex} doesn't look like a method signature, scanning downward...`)
-              for (let i = lineIndex; i < Math.min(lineIndex + 10, document.lineCount); i++) {
-                const line = document.lineAt(i).text.trim()
-                if (line.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/) && line.includes('(')) {
-                  methodSignatureLine = i
-                  gimOutputChannel.appendLine(`[DEBUG] Found method signature at line ${i}: ${line.substring(0, 60)}...`)
-                  break
-                }
-              }
-            }
-
-            const methodStartLine = document.lineAt(methodSignatureLine)
-            const insertPosition = methodStartLine.range.start
-
-            const formattedAnalysis = fullResponse
-              .split('\n')
-              .filter(line => line.trim().length > 0)
-              .map(line => `// ${line}`)
-              .join('\n')
-
-            const analysisWithNewline = `${formattedAnalysis}\n`
-
-            gimOutputChannel.appendLine(`[DEBUG] Final insertion at line ${methodSignatureLine}, position ${insertPosition.character}`)
-
-            await editor.edit((editBuilder) => {
-              editBuilder.insert(insertPosition, analysisWithNewline)
+            // Show analysis in a separate document
+            const analysisDocument = await vscode.workspace.openTextDocument({
+              content: `# Analysis for ${dbMethod.method_signature}\n\nFile: ${editor.document.fileName}\nLine: ${dbMethod.method_start_line}\n\n---\n\n${fullResponse}`,
+              language: 'markdown',
             })
 
-            const updatedDocument = editor.document
-            const analysisLines = formattedAnalysis.split('\n').length
-
-            const decorationType = vscode.window.createTextEditorDecorationType({
-              backgroundColor: 'rgba(100, 150, 200, 0.2)',
-              borderColor: 'rgba(100, 150, 200, 0.5)',
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              isWholeLine: true,
+            await vscode.window.showTextDocument(analysisDocument, {
+              viewColumn: vscode.ViewColumn.Beside,
+              preserveFocus: false,
             })
 
-            const ranges: vscode.Range[] = []
-            for (let i = 0; i < analysisLines; i++) {
-              const lineNum = methodSignatureLine + i
-              if (lineNum < updatedDocument.lineCount) {
-                ranges.push(updatedDocument.lineAt(lineNum).range)
-              }
-            }
-
-            editor.setDecorations(decorationType, ranges)
-
-            const userChoice = await vscode.window.showInformationMessage(
-              `Analysis for ${dbMethod.method_signature}`,
-              { modal: false },
-              'Accept',
-              'Discard',
-            )
-
-            if (userChoice === 'Accept') {
-              gimOutputChannel.appendLine(`Accepted analysis for ${dbMethod.method_signature}`)
-              editor.setDecorations(decorationType, []) // Clear decoration
-            }
-            else if (userChoice === 'Discard') {
-              await editor.edit((editBuilder) => {
-                const startPos = new vscode.Position(methodSignatureLine, 0)
-                const endPos = new vscode.Position(methodSignatureLine + analysisLines, 0)
-                editBuilder.delete(new vscode.Range(startPos, endPos))
-              })
-              gimOutputChannel.appendLine(`Discarded analysis for ${dbMethod.method_signature}`)
-            }
+            gimOutputChannel.appendLine(`Displayed analysis for ${dbMethod.method_signature}`)
           }
           else {
             gimOutputChannel.appendLine('Warning: Stream ended but no response content received')
@@ -730,7 +749,7 @@ async function generateExplanationForMethod(editor: vscode.TextEditor, dbMethod:
   const requestBody = {
     file_name: editor.document.fileName,
     signature: dbMethod.method_signature,
-    model_name: model,
+    model_name: currentModel,
   }
 
   gimOutputChannel.appendLine(`Requesting explanation for: ${JSON.stringify(requestBody)}`)
@@ -780,90 +799,18 @@ async function generateExplanationForMethod(editor: vscode.TextEditor, dbMethod:
           stream.off('data', onData)
 
           if (fullResponse.trim()) {
-            const document = editor.document
-
-            let lineIndex = dbMethod.method_start_line - 1
-            gimOutputChannel.appendLine(`[DEBUG] Database reported method starts at line ${dbMethod.method_start_line} (0-indexed: ${lineIndex})`)
-
-            if (lineIndex < 0 || lineIndex >= document.lineCount) {
-              gimOutputChannel.appendLine(`[ERROR] Line index ${lineIndex} is out of bounds (document has ${document.lineCount} lines)`)
-              vscode.window.showErrorMessage(`Could not insert explanation: line ${lineIndex} not found`)
-              resolve()
-              return
-            }
-
-            let methodSignatureLine = lineIndex
-            const methodLineContent = document.lineAt(lineIndex).text.trim()
-
-            if (!methodLineContent.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/)) {
-              gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex} doesn't look like a method signature, scanning downward...`)
-              for (let i = lineIndex; i < Math.min(lineIndex + 10, document.lineCount); i++) {
-                const line = document.lineAt(i).text.trim()
-                if (line.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/) && line.includes('(')) {
-                  methodSignatureLine = i
-                  gimOutputChannel.appendLine(`[DEBUG] Found method signature at line ${i}: ${line.substring(0, 60)}...`)
-                  break
-                }
-              }
-            }
-
-            const methodStartLine = document.lineAt(methodSignatureLine)
-            const insertPosition = methodStartLine.range.start
-
-            const formattedExplanation = fullResponse
-              .split('\n')
-              .filter(line => line.trim().length > 0)
-              .map(line => `// ${line}`)
-              .join('\n')
-
-            const explanationWithNewline = `${formattedExplanation}\n`
-
-            gimOutputChannel.appendLine(`[DEBUG] Final insertion at line ${methodSignatureLine}, position ${insertPosition.character}`)
-
-            await editor.edit((editBuilder) => {
-              editBuilder.insert(insertPosition, explanationWithNewline)
+            // Show explanation in a separate document
+            const explanationDocument = await vscode.workspace.openTextDocument({
+              content: `# Explanation for ${dbMethod.method_signature}\n\nFile: ${editor.document.fileName}\nLine: ${dbMethod.method_start_line}\n\n---\n\n${fullResponse}`,
+              language: 'markdown',
             })
 
-            const updatedDocument = editor.document
-            const explanationLines = formattedExplanation.split('\n').length
-
-            const decorationType = vscode.window.createTextEditorDecorationType({
-              backgroundColor: 'rgba(200, 150, 100, 0.2)',
-              borderColor: 'rgba(200, 150, 100, 0.5)',
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              isWholeLine: true,
+            await vscode.window.showTextDocument(explanationDocument, {
+              viewColumn: vscode.ViewColumn.Beside,
+              preserveFocus: false,
             })
 
-            const ranges: vscode.Range[] = []
-            for (let i = 0; i < explanationLines; i++) {
-              const lineNum = methodSignatureLine + i
-              if (lineNum < updatedDocument.lineCount) {
-                ranges.push(updatedDocument.lineAt(lineNum).range)
-              }
-            }
-
-            editor.setDecorations(decorationType, ranges)
-
-            const userChoice = await vscode.window.showInformationMessage(
-              `Explanation for ${dbMethod.method_signature}`,
-              { modal: false },
-              'Accept',
-              'Discard',
-            )
-
-            if (userChoice === 'Accept') {
-              gimOutputChannel.appendLine(`Accepted explanation for ${dbMethod.method_signature}`)
-              editor.setDecorations(decorationType, []) // Clear decoration
-            }
-            else if (userChoice === 'Discard') {
-              await editor.edit((editBuilder) => {
-                const startPos = new vscode.Position(methodSignatureLine, 0)
-                const endPos = new vscode.Position(methodSignatureLine + explanationLines, 0)
-                editBuilder.delete(new vscode.Range(startPos, endPos))
-              })
-              gimOutputChannel.appendLine(`Discarded explanation for ${dbMethod.method_signature}`)
-            }
+            gimOutputChannel.appendLine(`Displayed explanation for ${dbMethod.method_signature}`)
           }
           else {
             gimOutputChannel.appendLine('Warning: Stream ended but no response content received')
