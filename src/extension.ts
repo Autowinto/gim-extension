@@ -25,7 +25,6 @@ class GimCodeActionProvider implements vscode.CodeActionProvider {
       command: 'gim.selection.docstring',
       title: 'GIM: Generate Docstring',
       tooltip: 'Generates a C# XML docstring for the selected code.',
-      // Pass the selection as an argument to the command
       arguments: [range],
     }
 
@@ -34,7 +33,6 @@ class GimCodeActionProvider implements vscode.CodeActionProvider {
       command: 'gim.selection.analyze',
       title: 'GIM: Analyze Code',
       tooltip: 'Analyzes the selected code for potential issues.',
-      // Pass the selection as an argument to the command
       arguments: [range],
     }
 
@@ -43,11 +41,9 @@ class GimCodeActionProvider implements vscode.CodeActionProvider {
       command: 'gim.selection.explain',
       title: 'GIM: Explain Code',
       tooltip: 'Explains the selected code.',
-      // Pass the selection as an argument to the command
       arguments: [range],
     }
 
-    // Only show selection-based actions if there is a selection
     if (range.isEmpty) {
       console.log('CODE_ACTION: No selection, providing file-level actions')
       return [docstringAction, analyzeAction, explainAction]
@@ -58,7 +54,6 @@ class GimCodeActionProvider implements vscode.CodeActionProvider {
       command: 'gim.selection.docstring',
       title: 'GIM: Generate Docstring',
       tooltip: 'Generates a C# XML docstring for the selected code.',
-      // Pass the selection as an argument to the command
       arguments: [range],
     }
 
@@ -87,7 +82,6 @@ class GimCodeActionProvider implements vscode.CodeActionProvider {
 const model = 'gpt-oss:latest'
 
 export function activate(context: vscode.ExtensionContext) {
-  // Initial update indexes on activation
   gimOutputChannel = vscode.window.createOutputChannel('GIM')
 
   gimOutputChannel.appendLine('Starting AI Server...')
@@ -132,7 +126,6 @@ export function activate(context: vscode.ExtensionContext) {
     ),
   )
 
-  // Register our custom Code Action provider for C# files.
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
       { scheme: 'file', language: 'csharp', pattern: '**/*.{cs,csx}' },
@@ -287,7 +280,6 @@ async function docstringFromSelection() {
     return
   }
 
-  // Process methods in reverse order (bottom to top) so line numbers don't shift
   for (let i = dbMethods.length - 1; i >= 0; i--) {
     const dbMethod = dbMethods[i]
     gimOutputChannel.appendLine(`\n--- Processing method ${dbMethods.length - i}/${dbMethods.length}: ${dbMethod.method_signature} ---`)
@@ -317,7 +309,6 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
 
     const stream = response.data
 
-    // Use withProgress to show a cancellable progress notification
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
       title: `Generating docstring for ${dbMethod.method_signature}...`,
@@ -326,7 +317,6 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
       let fullResponse = ''
       const onData = (chunk: Buffer) => {
         const data = chunk.toString('utf-8').replaceAll('data: ', '').trim()
-        // SSE format is "data: ...\n\n"
         gimOutputChannel.appendLine(`Received chunk: ${data}`)
         try {
           if (data) {
@@ -352,10 +342,8 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
           stream.off('data', onData)
 
           if (fullResponse.trim()) {
-            // Insert the docstring inline with pending decoration
             const document = editor.document
 
-            // The database line numbers are 1-indexed, so adjust to 0-indexed for VSCode
             let lineIndex = dbMethod.method_start_line - 1
             gimOutputChannel.appendLine(`[DEBUG] Database reported method starts at line ${dbMethod.method_start_line} (0-indexed: ${lineIndex})`)
 
@@ -366,19 +354,15 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
               return
             }
 
-            // Log surrounding lines for context
             gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex - 1}: ${document.lineAt(Math.max(0, lineIndex - 1)).text}`)
             gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex}: ${document.lineAt(lineIndex).text}`)
             gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex + 1}: ${document.lineAt(Math.min(document.lineCount - 1, lineIndex + 1)).text}`)
 
-            // Find the actual method signature line by looking for keywords like 'public', 'private', 'static', etc.
             let methodSignatureLine = lineIndex
             const methodLineContent = document.lineAt(lineIndex).text.trim()
 
-            // If the line doesn't contain typical method keywords, scan upward for attributes/access modifiers
             if (!methodLineContent.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/)) {
               gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex} doesn't look like a method signature, scanning upward...`)
-              // Scan down to find the actual method signature
               for (let i = lineIndex; i < Math.min(lineIndex + 10, document.lineCount); i++) {
                 const line = document.lineAt(i).text.trim()
                 if (line.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/) && line.includes('(')) {
@@ -402,16 +386,13 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
 
             gimOutputChannel.appendLine(`[DEBUG] Final insertion at line ${methodSignatureLine}, position ${insertPosition.character}`)
 
-            // Insert the docstring
             await editor.edit((editBuilder) => {
               editBuilder.insert(insertPosition, docstringWithNewline)
             })
 
-            // After insertion, the document has changed, so get fresh line references
             const updatedDocument = editor.document
             const docstringLines = formattedDocstring.split('\n').length
 
-            // Create a decoration for the pending docstring
             const decorationType = vscode.window.createTextEditorDecorationType({
               backgroundColor: 'rgba(100, 200, 100, 0.2)',
               borderColor: 'rgba(100, 200, 100, 0.5)',
@@ -430,7 +411,6 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
 
             editor.setDecorations(decorationType, ranges)
 
-            // Show inline accept/discard actions
             const userChoice = await vscode.window.showInformationMessage(
               `Docstring for ${dbMethod.method_signature}`,
               { modal: false },
@@ -443,9 +423,7 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
               editor.setDecorations(decorationType, []) // Clear decoration
             }
             else if (userChoice === 'Discard') {
-              // Discard - remove the inserted docstring
               await editor.edit((editBuilder) => {
-                // Calculate the range to delete (the docstring lines we just inserted)
                 const startPos = new vscode.Position(lineIndex, 0)
                 const endPos = new vscode.Position(lineIndex + docstringLines, 0)
                 editBuilder.delete(new vscode.Range(startPos, endPos))
@@ -486,20 +464,481 @@ async function generateDocstringForMethod(editor: vscode.TextEditor, dbMethod: D
 }
 
 function analyzeSelection() {
-  vscode.window.showInformationMessage('GIM: TODO IMPLEMENT SELECTION ANALYSIS!')
+  const editor = vscode.window.activeTextEditor
+  if (!editor) {
+    vscode.window.showInformationMessage('No active editor found.')
+    return
+  }
+
+  const document = editor.document
+  const selection = editor.selection
+
+  if (selection.isEmpty) {
+    vscode.window.showErrorMessage('GIM: Nothing is selected')
+    return
+  }
+
+  vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+    'vscode.executeDocumentSymbolProvider',
+    document.uri,
+  ).then(async (symbols) => {
+    if (!symbols) {
+      vscode.window.showErrorMessage('GIM: Nothing here')
+      return
+    }
+
+    const dbMethods = await getSelectedMethodsFromDb({
+      filePath: editor.document.fileName,
+      startLine: selection.start.line,
+      endLine: selection.end.line,
+    })
+
+    gimOutputChannel.appendLine(`Found ${dbMethods.length} methods for analysis`)
+
+    if (dbMethods.length === 0) {
+      vscode.window.showErrorMessage('GIM: Could not find any methods')
+      return
+    }
+
+    for (let i = dbMethods.length - 1; i >= 0; i--) {
+      const dbMethod = dbMethods[i]
+      gimOutputChannel.appendLine(`\n--- Analyzing method ${dbMethods.length - i}/${dbMethods.length}: ${dbMethod.method_signature} ---`)
+
+      await generateAnalysisForMethod(editor, dbMethod)
+    }
+  })
+}
+
+async function generateAnalysisForMethod(editor: vscode.TextEditor, dbMethod: DbMethodResult): Promise<void> {
+  const requestBody = {
+    file_name: editor.document.fileName,
+    signature: dbMethod.method_signature,
+    model_name: model,
+  }
+
+  gimOutputChannel.appendLine(`Requesting analysis for: ${JSON.stringify(requestBody)}`)
+
+  try {
+    const response: AxiosResponse<Stream> = await axios.post(
+      'http://127.0.0.1:9999/related-code',
+      requestBody,
+      {
+        responseType: 'stream',
+        timeout: 30000,
+      },
+    )
+
+    const stream = response.data
+
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: `Analyzing ${dbMethod.method_signature}...`,
+      cancellable: true,
+    }, async (progress, token) => {
+      let fullResponse = ''
+      const onData = (chunk: Buffer) => {
+        const data = chunk.toString('utf-8').replaceAll('data: ', '').trim()
+        gimOutputChannel.appendLine(`Received chunk: ${data}`)
+        try {
+          if (data) {
+            fullResponse += JSON.parse(data).token
+          }
+          progress.report({ message: 'Analyzing...' })
+        }
+        catch (e) {
+          gimOutputChannel.appendLine(`Failed to parse SSE JSON data: ${data}`)
+          gimOutputChannel.appendLine(`Parse error: ${String(e)}`)
+        }
+      }
+      stream.on('data', onData)
+
+      token.onCancellationRequested(() => {
+        stream.off('data', onData)
+        gimOutputChannel.appendLine('User canceled the analysis operation.')
+      })
+
+      return new Promise<void>((resolve, reject) => {
+        stream.on('end', async () => {
+          gimOutputChannel.appendLine('Stream ended.')
+          stream.off('data', onData)
+
+          if (fullResponse.trim()) {
+            const document = editor.document
+
+            const lineIndex = dbMethod.method_start_line - 1
+            gimOutputChannel.appendLine(`[DEBUG] Database reported method starts at line ${dbMethod.method_start_line} (0-indexed: ${lineIndex})`)
+
+            if (lineIndex < 0 || lineIndex >= document.lineCount) {
+              gimOutputChannel.appendLine(`[ERROR] Line index ${lineIndex} is out of bounds (document has ${document.lineCount} lines)`)
+              vscode.window.showErrorMessage(`Could not insert analysis: line ${lineIndex} not found`)
+              resolve()
+              return
+            }
+
+            let methodSignatureLine = lineIndex
+            const methodLineContent = document.lineAt(lineIndex).text.trim()
+
+            if (!methodLineContent.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/)) {
+              gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex} doesn't look like a method signature, scanning downward...`)
+              for (let i = lineIndex; i < Math.min(lineIndex + 10, document.lineCount); i++) {
+                const line = document.lineAt(i).text.trim()
+                if (line.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/) && line.includes('(')) {
+                  methodSignatureLine = i
+                  gimOutputChannel.appendLine(`[DEBUG] Found method signature at line ${i}: ${line.substring(0, 60)}...`)
+                  break
+                }
+              }
+            }
+
+            const methodStartLine = document.lineAt(methodSignatureLine)
+            const insertPosition = methodStartLine.range.start
+
+            const formattedAnalysis = fullResponse
+              .split('\n')
+              .filter(line => line.trim().length > 0)
+              .map(line => `// ${line}`)
+              .join('\n')
+
+            const analysisWithNewline = `${formattedAnalysis}\n`
+
+            gimOutputChannel.appendLine(`[DEBUG] Final insertion at line ${methodSignatureLine}, position ${insertPosition.character}`)
+
+            await editor.edit((editBuilder) => {
+              editBuilder.insert(insertPosition, analysisWithNewline)
+            })
+
+            const updatedDocument = editor.document
+            const analysisLines = formattedAnalysis.split('\n').length
+
+            const decorationType = vscode.window.createTextEditorDecorationType({
+              backgroundColor: 'rgba(100, 150, 200, 0.2)',
+              borderColor: 'rgba(100, 150, 200, 0.5)',
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              isWholeLine: true,
+            })
+
+            const ranges: vscode.Range[] = []
+            for (let i = 0; i < analysisLines; i++) {
+              const lineNum = methodSignatureLine + i
+              if (lineNum < updatedDocument.lineCount) {
+                ranges.push(updatedDocument.lineAt(lineNum).range)
+              }
+            }
+
+            editor.setDecorations(decorationType, ranges)
+
+            const userChoice = await vscode.window.showInformationMessage(
+              `Analysis for ${dbMethod.method_signature}`,
+              { modal: false },
+              'Accept',
+              'Discard',
+            )
+
+            if (userChoice === 'Accept') {
+              gimOutputChannel.appendLine(`Accepted analysis for ${dbMethod.method_signature}`)
+              editor.setDecorations(decorationType, []) // Clear decoration
+            }
+            else if (userChoice === 'Discard') {
+              await editor.edit((editBuilder) => {
+                const startPos = new vscode.Position(methodSignatureLine, 0)
+                const endPos = new vscode.Position(methodSignatureLine + analysisLines, 0)
+                editBuilder.delete(new vscode.Range(startPos, endPos))
+              })
+              gimOutputChannel.appendLine(`Discarded analysis for ${dbMethod.method_signature}`)
+            }
+          }
+          else {
+            gimOutputChannel.appendLine('Warning: Stream ended but no response content received')
+            vscode.window.showWarningMessage(`No analysis generated for ${dbMethod.method_signature}`)
+          }
+          resolve()
+        })
+
+        stream.on('error', (err) => {
+          gimOutputChannel.appendLine(`Stream error: ${String(err)}`)
+          gimOutputChannel.appendLine(`Partial response collected: ${fullResponse.length} characters`)
+          vscode.window.showErrorMessage('Error streaming response from AI server.')
+          reject(err)
+        })
+
+        stream.on('close', () => {
+          gimOutputChannel.appendLine('Stream closed')
+        })
+      })
+    })
+  }
+  catch (error) {
+    if (axios.isAxiosError(error)) {
+      gimOutputChannel.appendLine(`Axios error: ${error.message}`)
+      vscode.window.showErrorMessage(`Failed to connect to AI server: ${error.message}`)
+    }
+    else {
+      gimOutputChannel.appendLine(`Unexpected error: ${String(error)}`)
+      vscode.window.showErrorMessage('An unexpected error occurred.')
+    }
+  }
 }
 
 function explainFromSelection() {
-  vscode.window.showInformationMessage('GIM: TODO IMPLEMENT EXPLAIN SELECTION!')
-}
-
-function analyzeFile() {
   const editor = vscode.window.activeTextEditor
   if (!editor) {
-    vscode.window.showInformationMessage(`GIM: Current file is !${editor.document}`)
+    vscode.window.showInformationMessage('No active editor found.')
     return
   }
-  vscode.window.showErrorMessage('GIM: No file open')
+
+  const document = editor.document
+  const selection = editor.selection
+
+  if (selection.isEmpty) {
+    vscode.window.showErrorMessage('GIM: Nothing is selected')
+    return
+  }
+
+  vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+    'vscode.executeDocumentSymbolProvider',
+    document.uri,
+  ).then(async (symbols) => {
+    if (!symbols) {
+      vscode.window.showErrorMessage('GIM: Nothing here')
+      return
+    }
+
+    const dbMethods = await getSelectedMethodsFromDb({
+      filePath: editor.document.fileName,
+      startLine: selection.start.line,
+      endLine: selection.end.line,
+    })
+
+    gimOutputChannel.appendLine(`Found ${dbMethods.length} methods for explanation`)
+
+    if (dbMethods.length === 0) {
+      vscode.window.showErrorMessage('GIM: Could not find any methods')
+      return
+    }
+
+    for (let i = dbMethods.length - 1; i >= 0; i--) {
+      const dbMethod = dbMethods[i]
+      gimOutputChannel.appendLine(`\n--- Explaining method ${dbMethods.length - i}/${dbMethods.length}: ${dbMethod.method_signature} ---`)
+
+      await generateExplanationForMethod(editor, dbMethod)
+    }
+  })
+}
+
+async function generateExplanationForMethod(editor: vscode.TextEditor, dbMethod: DbMethodResult): Promise<void> {
+  const requestBody = {
+    file_name: editor.document.fileName,
+    signature: dbMethod.method_signature,
+    model_name: model,
+  }
+
+  gimOutputChannel.appendLine(`Requesting explanation for: ${JSON.stringify(requestBody)}`)
+
+  try {
+    const response: AxiosResponse<Stream> = await axios.post(
+      'http://127.0.0.1:9999/explain',
+      requestBody,
+      {
+        responseType: 'stream',
+        timeout: 30000,
+      },
+    )
+
+    const stream = response.data
+
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: `Explaining ${dbMethod.method_signature}...`,
+      cancellable: true,
+    }, async (progress, token) => {
+      let fullResponse = ''
+      const onData = (chunk: Buffer) => {
+        const data = chunk.toString('utf-8').replaceAll('data: ', '').trim()
+        gimOutputChannel.appendLine(`Received chunk: ${data}`)
+        try {
+          if (data) {
+            fullResponse += JSON.parse(data).token
+          }
+          progress.report({ message: 'Explaining...' })
+        }
+        catch (e) {
+          gimOutputChannel.appendLine(`Failed to parse SSE JSON data: ${data}`)
+          gimOutputChannel.appendLine(`Parse error: ${String(e)}`)
+        }
+      }
+      stream.on('data', onData)
+
+      token.onCancellationRequested(() => {
+        stream.off('data', onData)
+        gimOutputChannel.appendLine('User canceled the explanation operation.')
+      })
+
+      return new Promise<void>((resolve, reject) => {
+        stream.on('end', async () => {
+          gimOutputChannel.appendLine('Stream ended.')
+          stream.off('data', onData)
+
+          if (fullResponse.trim()) {
+            const document = editor.document
+
+            let lineIndex = dbMethod.method_start_line - 1
+            gimOutputChannel.appendLine(`[DEBUG] Database reported method starts at line ${dbMethod.method_start_line} (0-indexed: ${lineIndex})`)
+
+            if (lineIndex < 0 || lineIndex >= document.lineCount) {
+              gimOutputChannel.appendLine(`[ERROR] Line index ${lineIndex} is out of bounds (document has ${document.lineCount} lines)`)
+              vscode.window.showErrorMessage(`Could not insert explanation: line ${lineIndex} not found`)
+              resolve()
+              return
+            }
+
+            let methodSignatureLine = lineIndex
+            const methodLineContent = document.lineAt(lineIndex).text.trim()
+
+            if (!methodLineContent.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/)) {
+              gimOutputChannel.appendLine(`[DEBUG] Line ${lineIndex} doesn't look like a method signature, scanning downward...`)
+              for (let i = lineIndex; i < Math.min(lineIndex + 10, document.lineCount); i++) {
+                const line = document.lineAt(i).text.trim()
+                if (line.match(/\b(public|private|protected|internal|static|async|void|int|string|bool|var)\b/) && line.includes('(')) {
+                  methodSignatureLine = i
+                  gimOutputChannel.appendLine(`[DEBUG] Found method signature at line ${i}: ${line.substring(0, 60)}...`)
+                  break
+                }
+              }
+            }
+
+            const methodStartLine = document.lineAt(methodSignatureLine)
+            const insertPosition = methodStartLine.range.start
+
+            const formattedExplanation = fullResponse
+              .split('\n')
+              .filter(line => line.trim().length > 0)
+              .map(line => `// ${line}`)
+              .join('\n')
+
+            const explanationWithNewline = `${formattedExplanation}\n`
+
+            gimOutputChannel.appendLine(`[DEBUG] Final insertion at line ${methodSignatureLine}, position ${insertPosition.character}`)
+
+            await editor.edit((editBuilder) => {
+              editBuilder.insert(insertPosition, explanationWithNewline)
+            })
+
+            const updatedDocument = editor.document
+            const explanationLines = formattedExplanation.split('\n').length
+
+            const decorationType = vscode.window.createTextEditorDecorationType({
+              backgroundColor: 'rgba(200, 150, 100, 0.2)',
+              borderColor: 'rgba(200, 150, 100, 0.5)',
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              isWholeLine: true,
+            })
+
+            const ranges: vscode.Range[] = []
+            for (let i = 0; i < explanationLines; i++) {
+              const lineNum = methodSignatureLine + i
+              if (lineNum < updatedDocument.lineCount) {
+                ranges.push(updatedDocument.lineAt(lineNum).range)
+              }
+            }
+
+            editor.setDecorations(decorationType, ranges)
+
+            const userChoice = await vscode.window.showInformationMessage(
+              `Explanation for ${dbMethod.method_signature}`,
+              { modal: false },
+              'Accept',
+              'Discard',
+            )
+
+            if (userChoice === 'Accept') {
+              gimOutputChannel.appendLine(`Accepted explanation for ${dbMethod.method_signature}`)
+              editor.setDecorations(decorationType, []) // Clear decoration
+            }
+            else if (userChoice === 'Discard') {
+              await editor.edit((editBuilder) => {
+                const startPos = new vscode.Position(methodSignatureLine, 0)
+                const endPos = new vscode.Position(methodSignatureLine + explanationLines, 0)
+                editBuilder.delete(new vscode.Range(startPos, endPos))
+              })
+              gimOutputChannel.appendLine(`Discarded explanation for ${dbMethod.method_signature}`)
+            }
+          }
+          else {
+            gimOutputChannel.appendLine('Warning: Stream ended but no response content received')
+            vscode.window.showWarningMessage(`No explanation generated for ${dbMethod.method_signature}`)
+          }
+          resolve()
+        })
+
+        stream.on('error', (err) => {
+          gimOutputChannel.appendLine(`Stream error: ${String(err)}`)
+          gimOutputChannel.appendLine(`Partial response collected: ${fullResponse.length} characters`)
+          vscode.window.showErrorMessage('Error streaming response from AI server.')
+          reject(err)
+        })
+
+        stream.on('close', () => {
+          gimOutputChannel.appendLine('Stream closed')
+        })
+      })
+    })
+  }
+  catch (error) {
+    if (axios.isAxiosError(error)) {
+      gimOutputChannel.appendLine(`Axios error: ${error.message}`)
+      vscode.window.showErrorMessage(`Failed to connect to AI server: ${error.message}`)
+    }
+    else {
+      gimOutputChannel.appendLine(`Unexpected error: ${String(error)}`)
+      vscode.window.showErrorMessage('An unexpected error occurred.')
+    }
+  }
+}
+
+async function analyzeFile() {
+  const editor = vscode.window.activeTextEditor
+  if (!editor) {
+    vscode.window.showErrorMessage('GIM: No file open')
+    return
+  }
+
+  const document = editor.document
+
+  gimOutputChannel.appendLine(`\n--- Analyzing file: ${document.fileName} ---`)
+
+  const dbMethods = await getSelectedMethodsFromDb({
+    filePath: document.fileName,
+    startLine: 0,
+    endLine: document.lineCount - 1,
+  })
+
+  gimOutputChannel.appendLine(`Found ${dbMethods.length} methods in file`)
+
+  if (dbMethods.length === 0) {
+    vscode.window.showInformationMessage('GIM: No methods found in file')
+    return
+  }
+
+  const confirmation = await vscode.window.showInformationMessage(
+    `Analyze ${dbMethods.length} method(s) in this file?`,
+    'Yes',
+    'No',
+  )
+
+  if (confirmation !== 'Yes') {
+    return
+  }
+
+  for (let i = dbMethods.length - 1; i >= 0; i--) {
+    const dbMethod = dbMethods[i]
+    gimOutputChannel.appendLine(`\n--- Analyzing method ${dbMethods.length - i}/${dbMethods.length}: ${dbMethod.method_signature} ---`)
+
+    await generateAnalysisForMethod(editor, dbMethod)
+  }
+
+  vscode.window.showInformationMessage(`Completed analysis of ${dbMethods.length} method(s)`)
 }
 
 export function deactivate() {
